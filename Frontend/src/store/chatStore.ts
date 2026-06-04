@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import axios from "axios";
-import { Message, Session } from "../types";
+import type { Message, Session } from "../types/index";
 
 const API = "http://localhost:8000";
 

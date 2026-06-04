@@ -2,34 +2,225 @@
 @tailwind components;
 @tailwind utilities;
 
+@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Lato:wght@300;400;700&family=Noto+Serif+Devanagari:wght@400;600&display=swap');
+
+:root {
+  --bg-primary: #0d0a07;        /* Deep warm black, like night sky */
+  --bg-secondary: #1a1408;      /* Dark saffron-tinted surface */
+  --bg-card: #221b0e;           /* Card background */
+  --bg-input: #2a2210;          /* Input fields */
+  --gold-primary: #d4a017;      /* Sacred gold */
+  --gold-light: #f0c040;        /* Highlight gold */
+  --gold-dim: #8a6a10;          /* Muted gold */
+  --saffron: #ff6b00;           /* Saffron accent */
+  --saffron-dim: #c45200;       /* Deep saffron */
+  --text-primary: #f5e6c8;      /* Warm cream white */
+  --text-secondary: #b8996a;    /* Muted gold text */
+  --text-dim: #7a6040;          /* Very muted */
+  --border: #3a2e1a;            /* Subtle border */
+  --glow: rgba(212, 160, 23, 0.15);  /* Gold glow effect */
+}
+
 * {
   margin: 0;
   padding: 0;
   box-sizing: border-box;
 }
 
-body { 
-  background: #0a0a0f; 
-  color: #e8e0d0; 
-  font-family: 'Georgia', serif;
+body {
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-family: 'Lato', sans-serif;
   min-height: 100vh;
+  background-image: 
+    radial-gradient(ellipse at 20% 50%, rgba(212, 160, 23, 0.05) 0%, transparent 50%),
+    radial-gradient(ellipse at 80% 20%, rgba(255, 107, 0, 0.03) 0%, transparent 40%);
 }
 
-/* Custom scrollbars */
+/* Scrollbar */
 ::-webkit-scrollbar {
-  width: 4px;
-  height: 4px;
+  width: 3px;
+  height: 3px;
 }
-
 ::-webkit-scrollbar-track {
-  background: #13131a;
+  background: var(--bg-secondary);
 }
-
 ::-webkit-scrollbar-thumb {
-  background: #c9a84c;
+  background: var(--gold-dim);
   border-radius: 2px;
 }
 
-::-webkit-scrollbar-thumb:hover {
-  background: #b5943b;
+/* Animations */
+@keyframes shimmer {
+  0% { background-position: -200% center; }
+  100% { background-position: 200% center; }
+}
+
+@keyframes pulse-glow {
+  0%, 100% {
+    text-shadow: 0 0 10px rgba(212, 160, 23, 0.4), 0 0 20px rgba(212, 160, 23, 0.1);
+  }
+  50% {
+    text-shadow: 0 0 20px rgba(212, 160, 23, 0.8), 0 0 35px rgba(212, 160, 23, 0.3);
+  }
+}
+
+@keyframes rotate-slow {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slide-in {
+  from { opacity: 0; transform: translateX(-10px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+.fade-in {
+  animation: fade-in 0.3s ease forwards;
+}
+
+.slide-in {
+  animation: slide-in 0.2s ease forwards;
+}
+
+/* Gold button */
+.btn-gold {
+  background: linear-gradient(135deg, var(--gold-primary), var(--saffron), var(--gold-primary));
+  background-size: 200% auto;
+  color: #0d0a07;
+  font-family: 'Cinzel', serif;
+  font-weight: 600;
+  border: none;
+  border-radius: 6px;
+  padding: 12px 24px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  animation: shimmer 3s linear infinite;
+  letter-spacing: 0.5px;
+}
+.btn-gold:hover {
+  box-shadow: 0 0 20px rgba(212, 160, 23, 0.4);
+  transform: translateY(-1px);
+}
+.btn-gold:disabled {
+  opacity: 0.5;
+  animation: none;
+}
+
+/* Gold outlined button */
+.btn-outline {
+  background: transparent;
+  color: var(--gold-primary);
+  border: 1px solid var(--gold-dim);
+  font-family: 'Cinzel', serif;
+  border-radius: 6px;
+  padding: 8px 16px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.btn-outline:hover {
+  border-color: var(--gold-primary);
+  background: var(--glow);
+}
+
+.input-field {
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  color: var(--text-primary);
+  border-radius: 6px;
+  padding: 12px 16px;
+  font-family: 'Lato', sans-serif;
+  font-size: 14px;
+  width: 100%;
+  transition: border-color 0.2s;
+  outline: none;
+}
+.input-field:focus {
+  border-color: var(--gold-dim);
+}
+.input-field::placeholder {
+  color: var(--text-dim);
+}
+
+/* Custom autofill styling to maintain dark theme */
+.input-field:-webkit-autofill,
+.input-field:-webkit-autofill:hover, 
+.input-field:-webkit-autofill:focus, 
+.input-field:-webkit-autofill:active {
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: var(--text-primary) !important;
+  transition: background-color 5000s ease-in-out 0s;
+  box-shadow: inset 0 0 20px 20px var(--bg-input) !important;
+}
+
+/* Card */
+.card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 20px;
+}
+
+/* Gold divider */
+.divider {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--gold-dim), transparent);
+  margin: 16px 0;
+}
+
+/* Logo */
+.logo {
+  font-family: 'Cinzel', serif;
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--gold-primary);
+  animation: pulse-glow 3s ease-in-out infinite;
+  letter-spacing: 2px;
+}
+
+/* Mandala background element */
+.mandala-bg {
+  position: fixed;
+  width: 600px;
+  height: 600px;
+  border-radius: 50%;
+  border: 1px solid rgba(212, 160, 23, 0.02);
+  top: 50%;
+  left: 50%;
+  margin-top: -300px;
+  margin-left: -300px;
+  animation: rotate-slow 120s linear infinite;
+  pointer-events: none;
+  z-index: 0;
+  background-image: repeating-conic-gradient(
+    from 0deg,
+    transparent 0deg,
+    transparent 15deg,
+    rgba(212, 160, 23, 0.005) 15deg,
+    rgba(212, 160, 23, 0.005) 30deg
+  );
+}
+.mandala-bg::before {
+  content: '';
+  position: absolute;
+  inset: 40px;
+  border-radius: 50%;
+  border: 1px solid rgba(212, 160, 23, 0.02);
+}
+.mandala-bg::after {
+  content: '';
+  position: absolute;
+  inset: 80px;
+  border-radius: 50%;
+  border: 1px solid rgba(212, 160, 23, 0.015);
+}
+
+/* Devnagari script font styles */
+.devanagari {
+  font-family: 'Noto Serif Devanagari', serif;
 }

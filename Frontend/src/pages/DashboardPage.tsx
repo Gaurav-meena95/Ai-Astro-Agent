@@ -53,7 +53,7 @@ export const DashboardPage: React.FC = () => {
   const handleGetTransits = async () => {
     if (isStreaming || !token) return;
     try {
-      await sendMessage("What are today's transits for my chart?", token, currentSession?.id);
+      await sendMessage("What are today's transits and how do they affect my chart?", token, currentSession?.id);
     } catch (err) {
       console.error(err);
     }
@@ -76,114 +76,176 @@ export const DashboardPage: React.FC = () => {
   const placements = profile?.placements || {};
   const houses = profile?.houses || {};
 
+  // Mock active aspects list for demonstration when under transit tab
+  const mockAspects = [
+    { transit_planet: "Jupiter", aspect: "TRINE", natal_planet: "Moon", orb: "1.2°" },
+    { transit_planet: "Saturn", aspect: "OPPOSITION", natal_planet: "Sun", orb: "2.5°" },
+    { transit_planet: "Mars", aspect: "CONJUNCTION", natal_planet: "Venus", orb: "0.8°" }
+  ];
+
   return (
     <div
-      className="h-screen flex overflow-hidden"
-      style={{ backgroundColor: "#0a0a0f", color: "#e8e0d0", fontFamily: "Georgia, serif" }}
+      className="h-screen w-full overflow-hidden"
+      style={{
+        display: "grid",
+        gridTemplateColumns: "240px 1fr 280px",
+        backgroundColor: "var(--bg-primary)",
+        color: "var(--text-primary)"
+      }}
     >
       {/* 1. LEFT SIDEBAR */}
       <div
-        className="w-60 flex flex-col justify-between border-r shrink-0"
-        style={{ backgroundColor: "#13131a", borderColor: "#2a2a3a" }}
+        className="flex flex-col justify-between h-full border-r relative z-10"
+        style={{ backgroundColor: "var(--bg-secondary)", borderColor: "var(--border)" }}
       >
         <div className="flex flex-col overflow-y-auto">
-          {/* Logo */}
+          {/* Logo Section */}
           <div
             onClick={newChat}
-            className="p-6 flex items-center space-x-3 cursor-pointer hover:opacity-85 border-b"
-            style={{ borderColor: "#2a2a3a" }}
+            className="p-6 cursor-pointer border-b flex flex-col justify-center items-center"
+            style={{ borderColor: "var(--border)" }}
           >
-            <span className="text-2xl" style={{ color: "#c9a84c" }}>
-              ✦
-            </span>
-            <span className="text-xl font-semibold tracking-wider">Aradhana</span>
+            <div className="logo text-xl">✦ ARADHANA</div>
+            <p
+              className="text-[10px] uppercase tracking-widest mt-1 text-center font-medium"
+              style={{ color: "var(--text-secondary)", fontFamily: "Cinzel, serif" }}
+            >
+              Jyotish Companion
+            </p>
           </div>
 
           {/* New Consultation Button */}
           <div className="p-4">
             <button
               onClick={newChat}
-              className="w-full py-2.5 rounded-lg border font-medium text-sm transition-all hover:scale-[1.01]"
-              style={{
-                borderColor: "#c9a84c",
-                color: "#c9a84c",
-                backgroundColor: "rgba(201, 168, 76, 0.05)"
-              }}
+              className="btn-outline w-full flex items-center justify-center space-x-1 py-2.5 text-xs uppercase font-bold tracking-wider"
             >
-              New Consultation
+              <span>✦</span> <span>New Consultation</span>
             </button>
           </div>
 
           {/* Sessions List */}
-          <div className="px-4 py-2 space-y-1">
-            <p className="text-xs uppercase tracking-wider opacity-45 px-2 mb-2">Sessions</p>
-            {sessions.length === 0 ? (
-              <p className="text-xs opacity-40 px-2 italic">No previous sessions</p>
-            ) : (
-              sessions.map((s) => (
-                <button
-                  key={s.id}
-                  onClick={() => token && loadSession(s.id, token)}
-                  className="w-full text-left p-2.5 rounded-lg text-sm transition-colors block truncate"
-                  style={{
-                    backgroundColor: currentSession?.id === s.id ? "rgba(201, 168, 76, 0.1)" : "transparent",
-                    color: currentSession?.id === s.id ? "#c9a84c" : "#e8e0d0",
-                    border: currentSession?.id === s.id ? "1px solid rgba(201, 168, 76, 0.2)" : "1px solid transparent"
-                  }}
-                >
-                  <span className="block truncate font-medium">{s.title || "Untitled Session"}</span>
-                  <span className="text-[10px] opacity-50 block mt-1">{formatDate(s.created_at)}</span>
-                </button>
-              ))
-            )}
+          <div className="px-3 py-2 space-y-1">
+            <p
+              style={{ fontFamily: "Cinzel, serif", color: "var(--text-secondary)" }}
+              className="text-[10px] uppercase tracking-wider px-2 mb-2 font-bold opacity-75"
+            >
+              Consultations
+            </p>
+            <div className="space-y-1.5 overflow-y-auto max-h-[calc(100vh-280px)] pr-1">
+              {sessions.length === 0 ? (
+                <p className="text-[11px] opacity-40 px-2 italic font-serif">No previous cosmic records</p>
+              ) : (
+                sessions.map((s) => {
+                  const isActive = currentSession?.id === s.id;
+                  return (
+                    <button
+                      key={s.id}
+                      onClick={() => token && loadSession(s.id, token)}
+                      className="w-full text-left p-3 rounded-lg text-xs transition-all block truncate slide-in"
+                      style={{
+                        backgroundColor: isActive ? "var(--glow)" : "transparent",
+                        color: isActive ? "var(--gold-primary)" : "var(--text-primary)",
+                        borderLeft: isActive ? "2px solid var(--gold-primary)" : "2px solid transparent",
+                        borderColor: isActive ? "var(--gold-primary)" : "transparent"
+                      }}
+                      onMouseEnter={(e) => {
+                        if (!isActive) e.currentTarget.style.backgroundColor = "var(--bg-card)";
+                      }}
+                      onMouseLeave={(e) => {
+                        if (!isActive) e.currentTarget.style.backgroundColor = "transparent";
+                      }}
+                    >
+                      <span className="block truncate font-semibold">{s.title || "Consultation Record"}</span>
+                      <span className="text-[9px] opacity-50 block mt-1">{formatDate(s.created_at)}</span>
+                    </button>
+                  );
+                })
+              )}
+            </div>
           </div>
         </div>
 
-        {/* User Info & Logout */}
-        <div className="p-4 border-t flex items-center justify-between" style={{ borderColor: "#2a2a3a" }}>
-          <div className="truncate pr-2">
-            <p className="text-xs opacity-50">Logged in as</p>
-            <p className="text-sm font-semibold truncate" style={{ color: "#c9a84c" }}>
-              {username || "Cosmic User"}
-            </p>
+        {/* User Profile Footer */}
+        <div className="p-4 border-t flex flex-col space-y-3" style={{ borderColor: "var(--border)" }}>
+          <div className="flex items-center space-x-2 truncate">
+            <span style={{ color: "var(--gold-primary)" }} className="text-sm">✦</span>
+            <span className="text-xs font-semibold truncate" style={{ color: "var(--text-secondary)" }}>
+              {username || "Cosmic Traveler"}
+            </span>
           </div>
           <button
             onClick={logout}
-            className="p-2 rounded hover:bg-red-950/30 transition-colors text-xs border"
-            style={{ borderColor: "#ef4444/30", color: "#fca5a5" }}
+            className="w-full py-1.5 rounded text-[11px] border font-bold uppercase tracking-wider transition-colors hover:text-[#ff6b00]"
+            style={{
+              borderColor: "rgba(239, 68, 68, 0.2)",
+              color: "var(--text-dim)",
+              backgroundColor: "rgba(239, 68, 68, 0.02)"
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.borderColor = "var(--saffron)";
+              e.currentTarget.style.color = "var(--saffron)";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.borderColor = "rgba(239, 68, 68, 0.2)";
+              e.currentTarget.style.color = "var(--text-dim)";
+            }}
           >
-            Logout
+            Leave Presence
           </button>
         </div>
       </div>
 
       {/* 2. CENTER PANEL (CHAT) */}
-      <div className="flex-1 flex flex-col justify-between h-full bg-[#0a0a0f]">
-        {/* Messages Feed */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-6">
+      <div className="flex flex-col justify-between h-full relative z-10">
+        {/* Top bar header */}
+        <div
+          className="px-6 py-4 border-b flex flex-col justify-center"
+          style={{ backgroundColor: "var(--bg-primary)", borderColor: "var(--border)" }}
+        >
+          <h2 style={{ fontFamily: "Cinzel, serif", color: "var(--gold-primary)", fontSize: "16px" }} className="font-semibold tracking-wider">
+            Aradhana
+          </h2>
+          <p style={{ color: "var(--text-dim)", fontSize: "11px" }} className="italic mt-0.5">
+            Your personal Jyotish guide
+          </p>
+        </div>
+
+        {/* Message feed */}
+        <div className="flex-1 overflow-y-auto p-6 space-y-6" style={{ backgroundColor: "var(--bg-primary)" }}>
           {messages.length === 0 ? (
-            <div className="h-full flex flex-col items-center justify-center text-center opacity-60">
-              <span className="text-4xl mb-3" style={{ color: "#c9a84c" }}>
+            <div className="h-full flex flex-col items-center justify-center text-center">
+              <div
+                style={{ fontSize: "48px", animation: "pulse-glow 3s infinite", color: "var(--gold-primary)" }}
+              >
                 ✦
-              </span>
-              <p className="text-lg">Ask Aradhana anything about your chart...</p>
-              <p className="text-xs opacity-50 mt-1">Birth details loaded successfully.</p>
+              </div>
+              <p style={{ fontFamily: "Cinzel, serif", color: "var(--text-primary)" }} className="text-xl mt-4 tracking-wider">
+                Namaste
+              </p>
+              <p style={{ color: "var(--text-secondary)" }} className="text-xs mt-2 max-w-sm leading-relaxed">
+                Ask Aradhana anything about your cosmic journey and planetary alignments.
+              </p>
             </div>
           ) : (
             messages.map((msg, idx) => (
               <div
                 key={idx}
-                className={`flex ${msg.role === "human" ? "justify-end" : "justify-start"}`}
+                className={`flex ${msg.role === "human" ? "justify-end" : "justify-start"} fade-in`}
               >
                 <div
-                  className="max-w-[75%] p-4 rounded-2xl shadow-md border"
+                  className="max-w-[75%] p-4 shadow-lg border"
                   style={{
-                    backgroundColor: msg.role === "human" ? "#c9a84c" : "#13131a",
-                    color: msg.role === "human" ? "#000000" : "#e8e0d0",
-                    borderColor: msg.role === "human" ? "#c9a84c" : "#2a2a3a"
+                    background: msg.role === "human"
+                      ? "linear-gradient(135deg, var(--saffron-dim), var(--gold-dim))"
+                      : "var(--bg-card)",
+                    color: "var(--text-primary)",
+                    borderColor: msg.role === "human" ? "var(--saffron-dim)" : "var(--border)",
+                    borderLeft: msg.role === "ai" ? "3px solid var(--gold-primary)" : undefined,
+                    borderRadius: msg.role === "human" ? "16px 16px 4px 16px" : "4px 16px 16px 16px"
                   }}
                 >
-                  <div className="prose prose-invert text-sm max-w-none leading-relaxed">
+                  <div className="prose prose-invert text-xs leading-relaxed max-w-none">
                     {msg.role === "human" ? (
                       <p className="whitespace-pre-line font-serif">{msg.content}</p>
                     ) : (
@@ -194,45 +256,47 @@ export const DashboardPage: React.FC = () => {
               </div>
             ))
           )}
+
+          {/* Streaming dots */}
           {isStreaming && (
-            <div className="flex justify-start">
+            <div className="flex justify-start fade-in">
               <div
-                className="p-4 rounded-2xl border flex items-center space-x-2"
-                style={{ backgroundColor: "#13131a", borderColor: "#2a2a3a" }}
+                className="p-4 rounded-xl border flex items-center space-x-2"
+                style={{ backgroundColor: "var(--bg-card)", borderColor: "var(--border)" }}
               >
-                <div className="flex space-x-1">
-                  <div className="w-2.5 h-2.5 rounded-full animate-bounce bg-[#c9a84c]" style={{ animationDelay: "0ms" }}></div>
-                  <div className="w-2.5 h-2.5 rounded-full animate-bounce bg-[#c9a84c]" style={{ animationDelay: "150ms" }}></div>
-                  <div className="w-2.5 h-2.5 rounded-full animate-bounce bg-[#c9a84c]" style={{ animationDelay: "300ms" }}></div>
-                </div>
-                <span className="text-xs opacity-50">Aradhana is channelizing the stars...</span>
+                <span className="animate-pulse text-xs" style={{ color: "var(--gold-primary)" }}>✦</span>
+                <span className="animate-pulse text-xs" style={{ color: "var(--gold-primary)", animationDelay: "200ms" }}>✦</span>
+                <span className="animate-pulse text-xs" style={{ color: "var(--gold-primary)", animationDelay: "400ms" }}>✦</span>
+                <span className="text-[10px] text-dim ml-2 italic">Aradhana is channelizing...</span>
               </div>
             </div>
           )}
           <div ref={messagesEndRef} />
         </div>
 
-        {/* Input Box */}
-        <div className="p-4 border-t" style={{ borderColor: "#2a2a3a", backgroundColor: "#13131a" }}>
-          <div className="max-w-3xl mx-auto flex items-end space-x-3 bg-transparent border rounded-xl p-2" style={{ borderColor: "#2a2a3a" }}>
+        {/* Input box */}
+        <div
+          className="p-4 border-t"
+          style={{ backgroundColor: "var(--bg-secondary)", borderColor: "var(--border)" }}
+        >
+          <div className="max-w-3xl mx-auto flex items-end space-x-3 bg-transparent border rounded-xl p-2" style={{ borderColor: "var(--border)" }}>
             <textarea
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder="Ask about placement, career, or daily transits..."
-              rows={1}
-              className="flex-1 bg-transparent border-0 outline-none text-sm resize-none px-2 py-1 max-h-32 min-h-[24px]"
-              style={{ color: "#e8e0d0" }}
-            />
-            <button
-              onClick={handleSend}
-              disabled={isStreaming || !input.trim()}
-              className="px-4 py-2 rounded-lg font-semibold text-xs tracking-wider transition-all text-black disabled:opacity-50"
+              placeholder="Ask about your chart, transits, or cosmic guidance..."
+              className="input-field"
               style={{
-                backgroundColor: "#c9a84c"
+                resize: "none",
+                background: "transparent",
+                border: "none",
+                padding: "8px",
+                fontSize: "13px"
               }}
-            >
-              Send
+              rows={2}
+            />
+            <button onClick={handleSend} disabled={isStreaming || !input.trim()} className="btn-gold px-6">
+              ✦ Ask
             </button>
           </div>
         </div>
@@ -240,131 +304,126 @@ export const DashboardPage: React.FC = () => {
 
       {/* 3. RIGHT PANEL */}
       <div
-        className="w-72 border-l flex flex-col h-full shrink-0"
-        style={{ backgroundColor: "#13131a", borderColor: "#2a2a3a" }}
+        className="flex flex-col h-full border-l relative z-10"
+        style={{ backgroundColor: "var(--bg-secondary)", borderColor: "var(--border)" }}
       >
-        {/* Tabs header */}
-        <div className="flex border-b" style={{ borderColor: "#2a2a3a" }}>
+        {/* Tab switch header */}
+        <div className="flex border-b" style={{ borderColor: "var(--border)" }}>
           <button
             onClick={() => setActiveTab("chart")}
-            className="flex-1 py-3 text-center text-xs font-semibold uppercase tracking-wider"
+            className="flex-1 py-3.5 text-center text-[10px] font-bold uppercase tracking-wider"
             style={{
-              color: activeTab === "chart" ? "#c9a84c" : "#e8e0d0",
-              borderBottom: activeTab === "chart" ? "2px solid #c9a84c" : "none",
-              opacity: activeTab === "chart" ? 1 : 0.6
+              color: activeTab === "chart" ? "var(--gold-primary)" : "var(--text-secondary)",
+              borderBottom: activeTab === "chart" ? "2px solid var(--gold-primary)" : "none",
+              fontFamily: "Cinzel, serif"
             }}
           >
-            Chart
+            Natal Chart
           </button>
           <button
             onClick={() => setActiveTab("transits")}
-            className="flex-1 py-3 text-center text-xs font-semibold uppercase tracking-wider"
+            className="flex-1 py-3.5 text-center text-[10px] font-bold uppercase tracking-wider"
             style={{
-              color: activeTab === "transits" ? "#c9a84c" : "#e8e0d0",
-              borderBottom: activeTab === "transits" ? "2px solid #c9a84c" : "none",
-              opacity: activeTab === "transits" ? 1 : 0.6
+              color: activeTab === "transits" ? "var(--gold-primary)" : "var(--text-secondary)",
+              borderBottom: activeTab === "transits" ? "2px solid var(--gold-primary)" : "none",
+              fontFamily: "Cinzel, serif"
             }}
           >
             Transits
           </button>
         </div>
 
-        {/* Tab contents */}
+        {/* Tab Contents */}
         <div className="flex-1 overflow-y-auto p-4">
           {activeTab === "chart" ? (
-            <div className="space-y-4">
-              {/* Ascendant display */}
-              <div
-                className="p-4 rounded-xl text-center border"
-                style={{
-                  backgroundColor: "rgba(201, 168, 76, 0.05)",
-                  borderColor: "rgba(201, 168, 76, 0.3)"
-                }}
-              >
-                <p className="text-xs opacity-50 uppercase tracking-widest">Ascendant</p>
-                <p className="text-2xl font-bold mt-1" style={{ color: "#c9a84c" }}>
+            <div className="space-y-5">
+              {/* Prominent Ascendant display */}
+              <div className="card text-center relative overflow-hidden">
+                <p
+                  className="text-[10px] uppercase tracking-widest font-semibold"
+                  style={{ color: "var(--text-secondary)", fontFamily: "Cinzel, serif" }}
+                >
+                  Ascendant
+                </p>
+                <p className="text-3xl font-bold mt-2" style={{ color: "var(--gold-primary)", fontFamily: "Cinzel, serif" }}>
                   {profile?.ascendant || "Unknown"}
                 </p>
+                <p className="text-[10px] text-dim mt-1.5 italic">Your rising sign & outer personality</p>
               </div>
 
+              <div className="divider" />
+
               {/* Placements list */}
-              <div className="space-y-2">
-                <p className="text-xs opacity-40 uppercase tracking-widest font-bold">Placements</p>
-                {Object.keys(placements).length === 0 ? (
-                  <p className="text-xs opacity-40 italic">No placements loaded</p>
-                ) : (
-                  Object.entries(placements).map(([planet, details]: any) => (
-                    <div
-                      key={planet}
-                      className="p-3 rounded-lg border flex flex-col space-y-1"
-                      style={{ borderColor: "#2a2a3a", backgroundColor: "#0a0a0f" }}
-                    >
-                      <div className="flex justify-between items-center">
-                        <span className="font-semibold text-xs" style={{ color: "#c9a84c" }}>
-                          {planet}
-                        </span>
-                        <span className="text-[10px] opacity-60">House {details.house}</span>
+              <div className="space-y-3">
+                <p
+                  className="text-[10px] uppercase tracking-wider font-bold"
+                  style={{ color: "var(--text-secondary)", fontFamily: "Cinzel, serif" }}
+                >
+                  Planetary Positions
+                </p>
+                <div className="grid grid-cols-1 gap-2.5">
+                  {Object.keys(placements).length === 0 ? (
+                    <p className="text-xs opacity-40 italic font-serif">Planets still aligning...</p>
+                  ) : (
+                    Object.entries(placements).map(([planet, details]: any) => (
+                      <div key={planet} className="card" style={{ padding: "12px" }}>
+                        <div className="flex justify-between items-center">
+                          <span className="text-[11px] font-bold uppercase" style={{ color: "var(--text-secondary)" }}>
+                            {planet}
+                          </span>
+                          <span
+                            className="text-xs font-semibold"
+                            style={{ color: "var(--gold-primary)", fontFamily: "Cinzel, serif" }}
+                          >
+                            {details.sign}
+                          </span>
+                        </div>
+                        <div className="flex justify-between items-center text-[10px] mt-1.5" style={{ color: "var(--text-dim)" }}>
+                          <span>House {details.house}</span>
+                          <span>{details.degree}°</span>
+                        </div>
                       </div>
-                      <div className="flex justify-between text-xs opacity-80">
-                        <span>{details.sign}</span>
-                        <span>{details.degree}°</span>
-                      </div>
-                    </div>
-                  ))
-                )}
+                    ))
+                  )}
+                </div>
               </div>
             </div>
           ) : (
-            <div className="space-y-4 flex flex-col h-full">
-              {/* Today's Transits Button */}
+            <div className="space-y-5 flex flex-col h-full">
+              {/* Get Today's Transits Button */}
               <button
                 onClick={handleGetTransits}
                 disabled={isStreaming}
-                className="w-full py-3 rounded-lg font-semibold text-xs tracking-wider transition-all text-black disabled:opacity-50"
-                style={{
-                  backgroundColor: "#c9a84c"
-                }}
+                className="btn-gold w-full text-xs py-3"
               >
-                Get Today's Transits
+                ✦ Today's Transits
               </button>
 
               {/* Transit aspects list */}
-              <div className="space-y-2 mt-2 flex-1">
-                <p className="text-xs opacity-40 uppercase tracking-widest font-bold">Active Transit Aspects</p>
-                {/* Dynamically display active aspects based on the date */}
-                <div className="space-y-2">
-                  <div
-                    className="p-3 rounded-lg border flex flex-col space-y-1"
-                    style={{ borderColor: "#2a2a3a", backgroundColor: "#0a0a0f" }}
-                  >
-                    <div className="flex justify-between items-center text-xs">
-                      <span className="font-semibold" style={{ color: "#c9a84c" }}>Jupiter ⚹ Moon</span>
-                      <span className="text-[10px] opacity-60 bg-green-950/40 text-green-300 border border-green-800/40 px-1.5 py-0.5 rounded">TRINE</span>
+              <div className="space-y-3 flex-1">
+                <p
+                  className="text-[10px] uppercase tracking-wider font-bold"
+                  style={{ color: "var(--text-secondary)", fontFamily: "Cinzel, serif" }}
+                >
+                  Active Transit Aspects
+                </p>
+                <div className="space-y-2.5">
+                  {mockAspects.map((aspect, idx) => (
+                    <div key={idx} className="card" style={{ padding: "12px" }}>
+                      <div
+                        className="text-[11px] font-semibold tracking-wide"
+                        style={{ color: "var(--text-primary)", fontFamily: "Cinzel, serif" }}
+                      >
+                        {aspect.transit_planet} <span style={{ color: "var(--saffron)" }}>{aspect.aspect}</span> natal {aspect.natal_planet}
+                      </div>
+                      <div className="flex justify-between items-center text-[10px] mt-1.5" style={{ color: "var(--text-dim)" }}>
+                        <span>Orb: {aspect.orb}</span>
+                        <span className="text-[9px] uppercase tracking-widest px-1.5 py-0.5 rounded" style={{ backgroundColor: "rgba(212,160,23,0.08)", color: "var(--gold-primary)", border: "1px solid var(--border)" }}>
+                          Active
+                        </span>
+                      </div>
                     </div>
-                    <span className="text-[10px] opacity-50">Orb: 1.2° — High emotional harmony & wisdom</span>
-                  </div>
-
-                  <div
-                    className="p-3 rounded-lg border flex flex-col space-y-1"
-                    style={{ borderColor: "#2a2a3a", backgroundColor: "#0a0a0f" }}
-                  >
-                    <div className="flex justify-between items-center text-xs">
-                      <span className="font-semibold" style={{ color: "#c9a84c" }}>Saturn ☍ Sun</span>
-                      <span className="text-[10px] opacity-60 bg-red-950/40 text-red-300 border border-red-800/40 px-1.5 py-0.5 rounded">OPPOSITION</span>
-                    </div>
-                    <span className="text-[10px] opacity-50">Orb: 2.5° — Professional duty & focus lessons</span>
-                  </div>
-
-                  <div
-                    className="p-3 rounded-lg border flex flex-col space-y-1"
-                    style={{ borderColor: "#2a2a3a", backgroundColor: "#0a0a0f" }}
-                  >
-                    <div className="flex justify-between items-center text-xs">
-                      <span className="font-semibold" style={{ color: "#c9a84c" }}>Mars ☌ Venus</span>
-                      <span className="text-[10px] opacity-60 bg-blue-950/40 text-blue-300 border border-blue-800/40 px-1.5 py-0.5 rounded">CONJUNCTION</span>
-                    </div>
-                    <span className="text-[10px] opacity-50">Orb: 0.8° — Creative drive & relationship passion</span>
-                  </div>
+                  ))}
                 </div>
               </div>
             </div>

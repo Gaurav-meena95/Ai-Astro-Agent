@@ -20,11 +20,10 @@ export const AuthPage: React.FC = () => {
         await login(email, password);
       } else {
         await signup(username, email, password);
-        // Automatically fetch profile after signup
         await fetchProfile();
       }
     } catch (err: any) {
-      setError(err.response?.data?.detail || "Authentication failed. Please check your credentials.");
+      setError(err.response?.data?.detail || "Authentication failed. Please verify your credentials.");
     } finally {
       setLoading(false);
     }
@@ -32,37 +31,33 @@ export const AuthPage: React.FC = () => {
 
   return (
     <div
-      className="min-h-screen flex items-center justify-center px-4"
-      style={{ backgroundColor: "#0a0a0f", color: "#e8e0d0", fontFamily: "Georgia, serif" }}
+      className="min-h-screen w-full flex items-center justify-center px-4 relative overflow-hidden"
+      style={{ backgroundColor: "var(--bg-primary)" }}
     >
-      <div
-        className="w-full max-w-md p-8 rounded-2xl shadow-2xl border transition-all duration-300"
-        style={{
-          backgroundColor: "#13131a",
-          borderColor: "#2a2a3a",
-          boxShadow: "0 10px 40px rgba(0,0,0,0.5)"
-        }}
-      >
-        {/* Logo and Header */}
-        <div className="text-center mb-8">
-          <div className="text-5xl mb-2 animate-pulse" style={{ color: "#c9a84c" }}>
-            ✦
-          </div>
-          <h1 className="text-3xl font-semibold tracking-wider" style={{ color: "#e8e0d0" }}>
-            Aradhana
-          </h1>
-          <p className="text-sm mt-2 opacity-60">Vedic Astrology & Cosmic Blueprint</p>
+      {/* Background mandala */}
+      <div className="mandala-bg" />
+
+      {/* Auth Card */}
+      <div className="card w-full max-w-[420px] relative z-10 shadow-2xl">
+        {/* Top: Logo */}
+        <div style={{ textAlign: "center", marginBottom: "32px" }}>
+          <div className="logo">✦ ARADHANA</div>
+          <p style={{ color: "var(--text-secondary)", fontSize: "13px", marginTop: "8px", fontFamily: "Cinzel, serif" }}>
+            Your Cosmic Guide
+          </p>
+          <div className="divider" style={{ marginTop: "24px" }} />
         </div>
 
         {/* Tab Switcher */}
-        <div className="flex border-b mb-6" style={{ borderColor: "#2a2a3a" }}>
+        <div className="flex border-b mb-6" style={{ borderColor: "var(--border)" }}>
           <button
             type="button"
-            className="flex-1 py-3 text-center font-medium transition-colors"
+            className="flex-1 py-3 text-center transition-all font-semibold"
             style={{
-              color: isLoginTab ? "#c9a84c" : "#e8e0d0",
-              borderBottom: isLoginTab ? "2px solid #c9a84c" : "none",
-              opacity: isLoginTab ? 1 : 0.6
+              color: isLoginTab ? "var(--gold-primary)" : "var(--text-secondary)",
+              borderBottom: isLoginTab ? "2px solid var(--gold-primary)" : "none",
+              fontFamily: "Cinzel, serif",
+              letterSpacing: "1px"
             }}
             onClick={() => {
               setIsLoginTab(true);
@@ -73,11 +68,12 @@ export const AuthPage: React.FC = () => {
           </button>
           <button
             type="button"
-            className="flex-1 py-3 text-center font-medium transition-colors"
+            className="flex-1 py-3 text-center transition-all font-semibold"
             style={{
-              color: !isLoginTab ? "#c9a84c" : "#e8e0d0",
-              borderBottom: !isLoginTab ? "2px solid #c9a84c" : "none",
-              opacity: !isLoginTab ? 1 : 0.6
+              color: !isLoginTab ? "var(--gold-primary)" : "var(--text-secondary)",
+              borderBottom: !isLoginTab ? "2px solid var(--gold-primary)" : "none",
+              fontFamily: "Cinzel, serif",
+              letterSpacing: "1px"
             }}
             onClick={() => {
               setIsLoginTab(false);
@@ -88,21 +84,24 @@ export const AuthPage: React.FC = () => {
           </button>
         </div>
 
-        {/* Error Message */}
+        {/* Error message */}
         {error && (
           <div
-            className="p-3 mb-6 rounded text-sm border bg-red-950/40"
-            style={{ borderColor: "#ef4444", color: "#fca5a5" }}
+            style={{ color: "var(--saffron)", borderColor: "var(--saffron-dim)" }}
+            className="p-3 mb-6 rounded text-sm border bg-red-950/20 text-center"
           >
             {error}
           </div>
         )}
 
-        {/* Form */}
+        {/* Form fields */}
         <form onSubmit={handleSubmit} className="space-y-5">
           {!isLoginTab && (
             <div>
-              <label className="block text-xs font-semibold uppercase tracking-wider mb-2 opacity-75">
+              <label
+                style={{ fontFamily: "Cinzel, serif", fontSize: "11px", letterSpacing: "1px" }}
+                className="block uppercase mb-2 opacity-75"
+              >
                 Username
               </label>
               <input
@@ -111,19 +110,16 @@ export const AuthPage: React.FC = () => {
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 placeholder="cosmic_traveler"
-                className="w-full px-4 py-3 rounded-lg border outline-none bg-transparent transition-all"
-                style={{
-                  borderColor: "#2a2a3a",
-                  color: "#e8e0d0"
-                }}
-                onFocus={(e) => (e.target.style.borderColor = "#c9a84c")}
-                onBlur={(e) => (e.target.style.borderColor = "#2a2a3a")}
+                className="input-field"
               />
             </div>
           )}
 
           <div>
-            <label className="block text-xs font-semibold uppercase tracking-wider mb-2 opacity-75">
+            <label
+              style={{ fontFamily: "Cinzel, serif", fontSize: "11px", letterSpacing: "1px" }}
+              className="block uppercase mb-2 opacity-75"
+            >
               Email Address
             </label>
             <input
@@ -132,18 +128,15 @@ export const AuthPage: React.FC = () => {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="you@universe.com"
-              className="w-full px-4 py-3 rounded-lg border outline-none bg-transparent transition-all"
-              style={{
-                borderColor: "#2a2a3a",
-                color: "#e8e0d0"
-              }}
-              onFocus={(e) => (e.target.style.borderColor = "#c9a84c")}
-              onBlur={(e) => (e.target.style.borderColor = "#2a2a3a")}
+              className="input-field"
             />
           </div>
 
           <div>
-            <label className="block text-xs font-semibold uppercase tracking-wider mb-2 opacity-75">
+            <label
+              style={{ fontFamily: "Cinzel, serif", fontSize: "11px", letterSpacing: "1px" }}
+              className="block uppercase mb-2 opacity-75"
+            >
               Password
             </label>
             <input
@@ -152,29 +145,19 @@ export const AuthPage: React.FC = () => {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="••••••••"
-              className="w-full px-4 py-3 rounded-lg border outline-none bg-transparent transition-all"
-              style={{
-                borderColor: "#2a2a3a",
-                color: "#e8e0d0"
-              }}
-              onFocus={(e) => (e.target.style.borderColor = "#c9a84c")}
-              onBlur={(e) => (e.target.style.borderColor = "#2a2a3a")}
+              className="input-field"
             />
           </div>
 
           <button
             type="submit"
             disabled={loading}
-            className="w-full py-3.5 rounded-lg font-semibold tracking-wider transition-all disabled:opacity-50 text-black hover:scale-[1.01]"
-            style={{
-              backgroundColor: "#c9a84c",
-              boxShadow: "0 4px 15px rgba(201, 168, 76, 0.3)"
-            }}
+            className="btn-gold w-full flex items-center justify-center py-3.5 mt-2"
           >
             {loading ? (
               <span className="flex items-center justify-center space-x-2">
                 <svg
-                  className="animate-spin h-5 w-5 text-black"
+                  className="animate-spin h-5 w-5 text-[#0d0a07]"
                   xmlns="http://www.w3.org/2000/svg"
                   fill="none"
                   viewBox="0 0 24 24"
@@ -193,7 +176,7 @@ export const AuthPage: React.FC = () => {
                     d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
                   ></path>
                 </svg>
-                <span>Entering Orbit...</span>
+                <span style={{ fontFamily: "Cinzel, serif" }}>Aligning Stars...</span>
               </span>
             ) : isLoginTab ? (
               "Reveal My Cosmos"
@@ -202,6 +185,20 @@ export const AuthPage: React.FC = () => {
             )}
           </button>
         </form>
+
+        {/* Bottom Sanskrit decoration */}
+        <div
+          className="devanagari"
+          style={{
+            textAlign: "center",
+            marginTop: "24px",
+            color: "var(--text-dim)",
+            fontSize: "12px",
+            letterSpacing: "3px"
+          }}
+        >
+          ॐ तत् सत्
+        </div>
       </div>
     </div>
   );
