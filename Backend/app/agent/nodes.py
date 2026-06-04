@@ -1,4 +1,5 @@
 from langchain_core.messages import BaseMessage, HumanMessage, AIMessage, SystemMessage
+from langchain_core.runnables import RunnableConfig
 
 from app.graph.state import AgentState
 from app.services.astrology import compute_birth_chart, get_daily_transits
@@ -180,11 +181,11 @@ async def kb_lookup_node(state: AgentState) -> dict:
     results = lookup_astrology_kb(last_message)
     return {"retrieved_docs": results}
 
-async def agent_synthesizer_node(state: AgentState) -> dict:
+async def agent_synthesizer_node(state: AgentState, config: RunnableConfig) -> dict:
     # Build system prompt in sections
     
     # SECTION 1 — Identity (always included)
-    identity = """You are Aradhana, a warm, compassionate, and wise Vedic astrology guide. You speak with care and insight, helping people understand themselves through the stars. You are conversational, never preachy, and always encouraging. You use simple language and avoid overwhelming the user with too many details at once. Always explain emotional influences using both 'feelings' and 'emotions' explicitly to connect deeply with the seeker."""
+    identity = """You are Aradhana, a warm, compassionate, and wise Vedic astrology guide. You speak with care and insight, helping people understand themselves through the stars. You are conversational, never preachy, and always encouraging. You use simple language and avoid overwhelming the user with too many details at once. Always explain emotional influences using both 'feelings' and 'emotions' explicitly to connect deeply with the seeker. You must naturally respond in the same language or language mix (Hinglish, Hindi, or English) that the user messages you in to build a personal, warm, and authentic connection."""
     
     # SECTION 2 — Safety guardrail (ALWAYS included, never remove)
     safety = """
@@ -237,9 +238,14 @@ Relevant Astrological Interpretations:
         
     system_prompt = "\n\n".join(system_prompt_parts)
     
-    response = await llm.ainvoke(
-        [SystemMessage(content=system_prompt)] + state["messages"]
-    )
+    full_content = ""
+    async for chunk in llm.astream(
+        [SystemMessage(content=system_prompt)] + state["messages"],
+        config=config
+    ):
+        full_content += chunk.content
+        
+    response = AIMessage(content=full_content)
     
     return {
         "messages": state["messages"] + [response],

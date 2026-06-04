@@ -1,206 +1,147 @@
-import React, { useState } from "react";
-import axios from "axios";
+import { useState } from "react";
 import { useAuthStore } from "../store/authStore";
+import axios from "axios";
 
-export const OnboardingPage: React.FC = () => {
-  const { token, fetchProfile } = useAuthStore();
-  const [birthDate, setBirthDate] = useState("");
-  const [birthTime, setBirthTime] = useState("");
-  const [birthPlace, setBirthPlace] = useState("");
+const CITIES = ["New Delhi", "Mumbai", "Bangalore", "London", "New York", "Dubai", "Singapore", "Tokyo"];
+const API = "http://localhost:8000";
+
+export default function OnboardingPage({ onComplete }: { onComplete: () => void }) {
+  const [date, setDate] = useState("");
+  const [time, setTime] = useState("");
+  const [place, setPlace] = useState("");
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState("");
+  const { token, fetchProfile } = useAuthStore();
 
-  const quickCities = ["New Delhi", "Mumbai", "London", "New York", "Tokyo", "Dubai"];
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!birthDate || !birthTime || !birthPlace) {
-      setError("Please fill out all fields.");
+  const handleSubmit = async () => {
+    if (!date || !time || !place) {
+      setError("Please fill all three fields");
       return;
     }
-
-    setError(null);
+    setError("");
     setLoading(true);
-
     try {
-      await axios.post(
-        "http://localhost:8000/api/profile/birth-chart",
-        {
-          birth_date: birthDate,
-          birth_time: birthTime,
-          birth_place: birthPlace
-        },
-        {
-          headers: {
-            Authorization: `Bearer ${token}`
-          }
-        }
-      );
+      await axios.post(`${API}/api/profile/birth-chart`, {
+        birth_date: date,
+        birth_time: time,
+        birth_place: place
+      }, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
       await fetchProfile();
-    } catch (err: any) {
-      setError(err.response?.data?.detail || "Failed to compute birth chart. Please check your inputs.");
+      onComplete();
+    } catch (e: any) {
+      setError(e?.response?.data?.detail || "Could not compute chart. Check your birth details.");
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div
-      className="min-h-screen w-full flex items-center justify-center px-4 relative overflow-hidden"
-      style={{ backgroundColor: "var(--bg-primary)" }}
-    >
-      {/* Background mandala */}
-      <div className="mandala-bg" />
+    <div style={{
+      minHeight: "100vh",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      padding: "24px",
+      background: "var(--bg)"
+    }}>
+      <div style={{ width: "100%", maxWidth: "440px" }}>
 
-      {/* Onboarding Card */}
-      <div className="card w-full max-w-[480px] relative z-10 shadow-2xl">
         {/* Header */}
         <div style={{ textAlign: "center", marginBottom: "32px" }}>
-          <div className="logo">✦ ARADHANA</div>
-          <div className="divider" style={{ marginTop: "16px", marginBottom: "16px" }} />
-          <h2 style={{ fontFamily: "Cinzel, serif", fontSize: "18px", color: "var(--text-primary)", marginTop: "16px" }}>
-            Your Cosmic Blueprint
-          </h2>
-          <p style={{ color: "var(--text-secondary)", fontSize: "13px", marginTop: "8px" }}>
-            The stars remember the moment you arrived
+          <div style={{
+            fontFamily: "Cinzel",
+            fontSize: "20px",
+            color: "var(--gold)",
+            letterSpacing: "2px",
+            marginBottom: "12px"
+          }}>✦ ARADHANA</div>
+          <h2 style={{
+            fontFamily: "Cinzel",
+            fontSize: "20px",
+            fontWeight: "600",
+            color: "var(--text)",
+            marginBottom: "8px"
+          }}>Your Cosmic Blueprint</h2>
+          <p style={{ color: "var(--text-muted)", fontSize: "13px", lineHeight: "1.6" }}>
+            Enter your birth details to compute your exact Vedic chart
           </p>
         </div>
 
-        {/* Error Message */}
-        {error && (
-          <div
-            style={{ color: "var(--saffron)", borderColor: "var(--saffron-dim)" }}
-            className="p-3 mb-6 rounded text-sm border bg-red-950/20 text-center"
-          >
-            {error}
-          </div>
-        )}
+        <div className="card">
 
-        {/* Onboarding Form */}
-        <form onSubmit={handleSubmit} className="space-y-6">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-            <div>
-              <label
-                style={{ fontFamily: "Cinzel, serif", fontSize: "11px", letterSpacing: "1px" }}
-                className="block uppercase mb-2 opacity-75"
-              >
-                Date of Birth
-              </label>
-              <input
-                type="date"
-                required
-                value={birthDate}
-                onChange={(e) => setBirthDate(e.target.value)}
-                className="input-field"
-                style={{ colorScheme: "dark" }}
-              />
-            </div>
-
-            <div>
-              <label
-                style={{ fontFamily: "Cinzel, serif", fontSize: "11px", letterSpacing: "1px" }}
-                className="block uppercase mb-2 opacity-75"
-              >
-                Time of Birth
-              </label>
-              <input
-                type="time"
-                required
-                value={birthTime}
-                onChange={(e) => setBirthTime(e.target.value)}
-                className="input-field"
-                style={{ colorScheme: "dark" }}
-              />
-            </div>
+          <div className="field">
+            <label className="label">Date of Birth</label>
+            <input className="input" type="date"
+              value={date}
+              onChange={e => setDate(e.target.value)} />
           </div>
 
-          <div>
-            <label
-              style={{ fontFamily: "Cinzel, serif", fontSize: "11px", letterSpacing: "1px" }}
-              className="block uppercase mb-2 opacity-75"
-            >
-              Place of Birth
-            </label>
-            <input
-              type="text"
-              required
-              value={birthPlace}
-              onChange={(e) => setBirthPlace(e.target.value)}
+          <div className="field">
+            <label className="label">Time of Birth</label>
+            <input className="input" type="time"
+              value={time}
+              onChange={e => setTime(e.target.value)} />
+            <p style={{ color: "var(--text-dim)", fontSize: "11px", marginTop: "4px" }}>
+              Exact time gives more accurate house positions
+            </p>
+          </div>
+
+          <div className="field">
+            <label className="label">Place of Birth</label>
+            <input className="input" type="text"
               placeholder="City, Country"
-              className="input-field"
-            />
-            {/* Quick Cities Select */}
-            <div style={{ display: "flex", flexWrap: "wrap", gap: "8px", marginTop: "12px" }}>
-              {quickCities.map((city) => (
-                <button
-                  key={city}
-                  type="button"
-                  onClick={() => setBirthPlace(city)}
-                  className="btn-outline text-xs"
+              value={place}
+              onChange={e => setPlace(e.target.value)} />
+          </div>
+
+          {/* Quick city select */}
+          <div style={{ marginBottom: "20px" }}>
+            <p style={{ color: "var(--text-dim)", fontSize: "11px", marginBottom: "8px" }}>
+              Quick select:
+            </p>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
+              {CITIES.map(city => (
+                <button key={city}
+                  onClick={() => setPlace(city)}
                   style={{
+                    background: place === city ? "var(--gold-dim)" : "var(--bg-surface)",
+                    border: `1px solid ${place === city ? "rgba(201,168,76,0.4)" : "var(--border)"}`,
+                    color: place === city ? "var(--gold)" : "var(--text-muted)",
+                    borderRadius: "6px",
+                    padding: "5px 10px",
                     fontSize: "12px",
-                    padding: "6px 12px",
-                    borderColor: birthPlace === city ? "var(--gold-primary)" : "var(--gold-dim)",
-                    color: birthPlace === city ? "var(--gold-light)" : "var(--gold-primary)",
-                    backgroundColor: birthPlace === city ? "var(--glow)" : "transparent"
-                  }}
-                >
+                    cursor: "pointer",
+                    fontFamily: "Inter",
+                    transition: "all 0.15s"
+                  }}>
                   {city}
                 </button>
               ))}
             </div>
           </div>
 
-          <button
-            type="submit"
-            disabled={loading}
-            className="btn-gold w-full flex items-center justify-center py-3.5 mt-2"
-          >
-            {loading ? (
-              <span className="flex items-center justify-center space-x-2">
-                <svg
-                  className="animate-spin h-5 w-5 text-[#0d0a07]"
-                  xmlns="http://www.w3.org/2000/svg"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                >
-                  <circle
-                    className="opacity-25"
-                    cx="12"
-                    cy="12"
-                    r="10"
-                    stroke="currentColor"
-                    strokeWidth="4"
-                  ></circle>
-                  <path
-                    className="opacity-75"
-                    fill="currentColor"
-                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                  ></path>
-                </svg>
-                <span style={{ fontFamily: "Cinzel, serif" }}>Reading cosmic patterns...</span>
-              </span>
-            ) : (
-              "✦ Calculate My Chart"
-            )}
+          <button className="btn-primary"
+            onClick={handleSubmit}
+            disabled={loading}>
+            {loading ? "Computing your chart..." : "Calculate My Chart →"}
           </button>
-        </form>
 
-        {/* Bottom Sanskrit quote */}
-        <div
-          className="devanagari text-center"
-          style={{
-            color: "var(--text-dim)",
-            fontSize: "12px",
-            marginTop: "24px",
-            letterSpacing: "1px"
-          }}
-        >
-          जातकं फलितं चैव होरा च गणितं तथा
+          {error && <p className="error-text">{error}</p>}
+
         </div>
+
+        <p style={{
+          textAlign: "center",
+          color: "var(--text-dim)",
+          fontSize: "11px",
+          marginTop: "16px"
+        }}>
+          ✦ Chart computed using real Swiss Ephemeris data
+        </p>
+
       </div>
     </div>
   );
-};
-
-export default OnboardingPage;
+}
