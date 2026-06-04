@@ -14,6 +14,7 @@ export const DashboardPage: FC = () => {
     currentSession,
     messages,
     isStreaming,
+    activeNode,
     fetchSessions,
     loadSession,
     sendMessage,
@@ -502,7 +503,11 @@ export const DashboardPage: FC = () => {
                   }}
                 >
                   <span style={{ fontSize: "11px", color: "var(--gold)", fontStyle: "italic" }}>
-                    ✦ Channelizing celestial alignments...
+                    {activeNode === "natal_engine" && "✦ Calculating exact birth chart placements (Swiss Ephemeris)..."}
+                    {activeNode === "transit_engine" && "✦ Analyzing today's planetary transits..."}
+                    {activeNode === "kb_lookup" && "✦ Consulting classical Vedic texts knowledge base..."}
+                    {activeNode === "agent_synthesizer" && "✦ Composing cosmic guidance..."}
+                    {!activeNode && "✦ Channelizing celestial alignments..."}
                   </span>
                 </div>
               </div>

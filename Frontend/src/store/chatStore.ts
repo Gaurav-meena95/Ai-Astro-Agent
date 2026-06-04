@@ -9,6 +9,7 @@ interface ChatState {
   currentSession: Session | null;
   messages: Message[];
   isStreaming: boolean;
+  activeNode: string | null;
   fetchSessions: (token: string) => Promise<void>;
   loadSession: (sessionId: string, token: string) => Promise<void>;
   sendMessage: (message: string, token: string, sessionId?: string) => Promise<void>;
@@ -20,6 +21,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
   currentSession: null,
   messages: [],
   isStreaming: false,
+  activeNode: null,
 
   fetchSessions: async (token) => {
     try {
@@ -60,7 +62,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
     // 1. Add empty human message to messages
     set(state => ({
       messages: [...state.messages, { role: "human", content: message }],
-      isStreaming: true
+      isStreaming: true,
+      activeNode: null
     }));
 
     try {
@@ -113,6 +116,9 @@ export const useChatStore = create<ChatState>((set, get) => ({
                   return { messages };
                 });
               }
+              if (data.node) {
+                set({ activeNode: data.node });
+              }
               if (data.session_id) {
                 set({
                   currentSession: {
@@ -123,7 +129,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
                 });
               }
               if (data.done) {
-                set({ isStreaming: false });
+                set({ isStreaming: false, activeNode: null });
               }
             } catch (e) {
               // Ignore JSON parse errors for incomplete chunks
@@ -134,9 +140,9 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
       // Refresh sessions
       await get().fetchSessions(token);
-      set({ isStreaming: false });
+      set({ isStreaming: false, activeNode: null });
     } catch (err) {
-      set({ isStreaming: false });
+      set({ isStreaming: false, activeNode: null });
       throw err;
     }
   },

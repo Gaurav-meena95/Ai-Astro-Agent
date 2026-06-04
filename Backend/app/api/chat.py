@@ -83,7 +83,11 @@ async def stream_response(message: str, session_id: Optional[str], current_user,
     
     try:
         async for event in agent_graph.astream_events(state, version="v1"):
-            if event["event"] == "on_chat_model_stream":
+            if event["event"] == "on_chain_start":
+                node_name = event.get("name")
+                if node_name in ["natal_engine", "transit_engine", "kb_lookup", "agent_synthesizer"]:
+                    yield f"data: {json.dumps({'node': node_name})}\n\n"
+            elif event["event"] == "on_chat_model_stream":
                 chunk = event["data"]["chunk"]
                 if hasattr(chunk, "content") and chunk.content:
                     full_response += chunk.content

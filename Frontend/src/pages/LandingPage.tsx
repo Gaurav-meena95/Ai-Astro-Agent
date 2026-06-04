@@ -1,4 +1,6 @@
 
+import { Orbit, Home, Zap, Lock } from "lucide-react";
+
 export default function LandingPage({ onGetStarted }: { onGetStarted: () => void }) {
   return (
     <div style={{
@@ -108,17 +110,21 @@ export default function LandingPage({ onGetStarted }: { onGetStarted: () => void
         background: "var(--border)"
       }}>
         {[
-          { icon: "🪐", title: "Real Ephemeris", desc: "Exact planetary positions, not guesses" },
-          { icon: "🏠", title: "12 Houses", desc: "Placidus house system with Vedic interpretation" },
-          { icon: "⚡", title: "Live Transits", desc: "Today's planetary energy for your chart" },
-          { icon: "🔒", title: "Private", desc: "Your data stays yours, always" }
+          { Icon: Orbit, title: "Real Ephemeris", desc: "Exact planetary positions, not guesses" },
+          { Icon: Home, title: "12 Houses", desc: "Placidus house system with Vedic interpretation" },
+          { Icon: Zap, title: "Live Transits", desc: "Today's planetary energy for your chart" },
+          { Icon: Lock, title: "Private", desc: "Your data stays yours, always" }
         ].map(f => (
           <div key={f.title} style={{
             background: "var(--bg)",
             padding: "28px 24px",
-            textAlign: "center"
+            textAlign: "center",
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "center"
           }}>
-            <div style={{ fontSize: "24px", marginBottom: "10px" }}>{f.icon}</div>
+            <f.Icon size={24} color="var(--gold)" style={{ marginBottom: "12px" }} />
             <div style={{ fontWeight: "500", fontSize: "14px", marginBottom: "6px" }}>{f.title}</div>
             <div style={{ color: "var(--text-muted)", fontSize: "13px" }}>{f.desc}</div>
           </div>
