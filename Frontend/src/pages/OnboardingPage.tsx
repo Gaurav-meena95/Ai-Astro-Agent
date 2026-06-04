@@ -3,7 +3,7 @@ import { useAuthStore } from "../store/authStore";
 import axios from "axios";
 
 const CITIES = ["New Delhi", "Mumbai", "Bangalore", "London", "New York", "Dubai", "Singapore", "Tokyo"];
-const API = "http://localhost:8000";
+const API = import.meta.env.VITE_API_URL || "http://localhost:8000";
 
 export default function OnboardingPage({ onComplete }: { onComplete: () => void }) {
   const [date, setDate] = useState("");
