@@ -4,6 +4,7 @@ import ReactMarkdown from "react-markdown";
 import { useAuthStore } from "../store/authStore";
 import { useChatStore } from "../store/chatStore";
 import axios from "axios";
+import { Settings, LogOut, Menu, Sparkles } from "lucide-react";
 
 const API = "http://localhost:8000";
 
@@ -231,7 +232,7 @@ export const DashboardPage: FC = () => {
               fontWeight: 500
             }}
           >
-            <span>✦</span> <span>New Consultation</span>
+            <Sparkles size={12} color="var(--gold)" /> <span>New Consultation</span>
           </button>
         </div>
 
@@ -320,7 +321,10 @@ export const DashboardPage: FC = () => {
           className="btn-secondary"
           style={{
             width: "100%",
-            textAlign: "center",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: "6px",
             padding: "8px 12px",
             borderRadius: "6px",
             fontSize: "11px",
@@ -338,14 +342,17 @@ export const DashboardPage: FC = () => {
             e.currentTarget.style.color = "var(--text-muted)";
           }}
         >
-          ⚙ Settings
+          <Settings size={12} /> Settings
         </button>
         <button
           onClick={handleLogout}
           className="btn-ghost"
           style={{
             width: "100%",
-            textAlign: "center",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: "6px",
             padding: "8px 12px",
             color: "var(--text-muted)",
             border: "1px solid rgba(239, 68, 68, 0.2)",
@@ -364,7 +371,7 @@ export const DashboardPage: FC = () => {
             e.currentTarget.style.color = "var(--text-muted)";
           }}
         >
-          Leave Presence
+          <LogOut size={12} /> Leave Presence
         </button>
       </div>
     </>
@@ -423,7 +430,7 @@ export const DashboardPage: FC = () => {
                   justifyContent: "center"
                 }}
               >
-                ☰
+                <Menu size={18} />
               </button>
             )}
             <div>
