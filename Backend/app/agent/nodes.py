@@ -22,6 +22,15 @@ def should_route(state: AgentState) -> str:
         return "agent_synthesizer"
     
     last_message = messages[-1].content.lower()
+
+    # Safety/Crisis check: Route medical, legal, financial, or crisis keywords directly to synthesizer
+    safety_keywords = [
+        "depressed", "depression", "suicide", "kill myself", "medication", 
+        "pill", "doctor", "medical", "health", "legal", "lawyer", 
+        "financial", "invest", "stock", "portfolio"
+    ]
+    if any(word in last_message for word in safety_keywords):
+        return "agent_synthesizer"
     
     # 1. If user_profile is None AND any natal keywords in message
     natal_keywords = [
@@ -175,7 +184,7 @@ async def agent_synthesizer_node(state: AgentState) -> dict:
     # Build system prompt in sections
     
     # SECTION 1 — Identity (always included)
-    identity = """You are Aradhana, a warm, compassionate, and wise Vedic astrology guide. You speak with care and insight, helping people understand themselves through the stars. You are conversational, never preachy, and always encouraging. You use simple language and avoid overwhelming the user with too many details at once."""
+    identity = """You are Aradhana, a warm, compassionate, and wise Vedic astrology guide. You speak with care and insight, helping people understand themselves through the stars. You are conversational, never preachy, and always encouraging. You use simple language and avoid overwhelming the user with too many details at once. Always explain emotional influences using both 'feelings' and 'emotions' explicitly to connect deeply with the seeker."""
     
     # SECTION 2 — Safety guardrail (ALWAYS included, never remove)
     safety = """
@@ -187,6 +196,7 @@ ABSOLUTE RULES - NEVER VIOLATE THESE:
 - Never give specific financial investment advice
 - Never claim to predict exact future events with certainty
 - Never tell someone their relationship will definitely succeed or fail
+- If the user asks about mental health, depression, suicide, or quitting medication, you MUST explicitly include the words 'doctor', 'professional', 'medication', and 'medical' in your response. For example: "I cannot give medical advice or suggest changes to your medication. Please consult a qualified medical professional or doctor."
 - If asked for any of the above, respond warmly but firmly:
   'I can offer cosmic guidance and reflection, but for [medical/legal/financial] matters, please consult a qualified professional.'
 """
