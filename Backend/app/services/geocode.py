@@ -1,71 +1,98 @@
-import logging
-from typing import Dict, Any, Tuple, Optional
-
-from geopy.geocoders import Nominatim
+import requests
 from timezonefinder import TimezoneFinder
 
-logger = logging.getLogger(__name__)
-
-# Strict offline fallback for standard grading queries in offline/restricted sandbox environments
-OFFLINE_CITIES: Dict[str, Dict[str, Any]] = {
-    "london": {"lat": 51.5074, "lon": -0.1278, "timezone": "Europe/London", "display_name": "London, United Kingdom"},
-    "new york": {"lat": 40.7128, "lon": -74.0060, "timezone": "America/New_York", "display_name": "New York, NY, USA"},
-    "new delhi": {"lat": 28.6139, "lon": 77.2090, "timezone": "Asia/Kolkata", "display_name": "New Delhi, Delhi, India"},
-    "delhi": {"lat": 28.6139, "lon": 77.2090, "timezone": "Asia/Kolkata", "display_name": "New Delhi, Delhi, India"},
-    "mumbai": {"lat": 19.0760, "lon": 72.8777, "timezone": "Asia/Kolkata", "display_name": "Mumbai, Maharashtra, India"},
-    "san francisco": {"lat": 37.7749, "lon": -122.4194, "timezone": "America/Los_Angeles", "display_name": "San Francisco, CA, USA"},
-    "tokyo": {"lat": 35.6762, "lon": 139.6503, "timezone": "Asia/Tokyo", "display_name": "Tokyo, Japan"},
-    "sydney": {"lat": -33.8688, "lon": 151.2093, "timezone": "Australia/Sydney", "display_name": "Sydney, NSW, Australia"},
-    "paris": {"lat": 48.8566, "lon": 2.3522, "timezone": "Europe/Paris", "display_name": "Paris, France"},
-    "berlin": {"lat": 52.5200, "lon": 13.4050, "timezone": "Europe/Berlin", "display_name": "Berlin, Germany"},
-    "toronto": {"lat": 43.6532, "lon": -79.3832, "timezone": "America/Toronto", "display_name": "Toronto, ON, Canada"},
+# Pre-defined offline city catalog exactly as requested
+OFFLINE_CITIES = {
+    "new delhi": {"lat": 28.6139, "lng": 77.2090, "display": "New Delhi, India", "timezone": "Asia/Kolkata"},
+    "delhi": {"lat": 28.6139, "lng": 77.2090, "display": "New Delhi, India", "timezone": "Asia/Kolkata"},
+    "mumbai": {"lat": 19.0760, "lng": 72.8777, "display": "Mumbai, India", "timezone": "Asia/Kolkata"},
+    "bangalore": {"lat": 12.9716, "lng": 77.5946, "display": "Bangalore, India", "timezone": "Asia/Kolkata"},
+    "chennai": {"lat": 13.0827, "lng": 80.2707, "display": "Chennai, India", "timezone": "Asia/Kolkata"},
+    "kolkata": {"lat": 22.5726, "lng": 88.3639, "display": "Kolkata, India", "timezone": "Asia/Kolkata"},
+    "hyderabad": {"lat": 17.3850, "lng": 78.4867, "display": "Hyderabad, India", "timezone": "Asia/Kolkata"},
+    "pune": {"lat": 18.5204, "lng": 73.8567, "display": "Pune, India", "timezone": "Asia/Kolkata"},
+    "jaipur": {"lat": 26.9124, "lng": 75.7873, "display": "Jaipur, India", "timezone": "Asia/Kolkata"},
+    "london": {"lat": 51.5074, "lng": -0.1278, "display": "London, UK", "timezone": "Europe/London"},
+    "new york": {"lat": 40.7128, "lng": -74.0060, "display": "New York, USA", "timezone": "America/New_York"},
+    "san francisco": {"lat": 37.7749, "lng": -122.4194, "display": "San Francisco, USA", "timezone": "America/Los_Angeles"},
+    "los angeles": {"lat": 34.0522, "lng": -118.2437, "display": "Los Angeles, USA", "timezone": "America/Los_Angeles"},
+    "chicago": {"lat": 41.8781, "lng": -87.6298, "display": "Chicago, USA", "timezone": "America/Chicago"},
+    "tokyo": {"lat": 35.6762, "lng": 139.6503, "display": "Tokyo, Japan", "timezone": "Asia/Tokyo"},
+    "sydney": {"lat": -33.8688, "lng": 151.2093, "display": "Sydney, Australia", "timezone": "Australia/Sydney"},
+    "paris": {"lat": 48.8566, "lng": 2.3522, "display": "Paris, France", "timezone": "Europe/Paris"},
+    "berlin": {"lat": 52.5200, "lng": 13.4050, "display": "Berlin, Germany", "timezone": "Europe/Berlin"},
+    "toronto": {"lat": 43.6532, "lng": -79.3832, "display": "Toronto, Canada", "timezone": "America/Toronto"},
+    "dubai": {"lat": 25.2048, "lng": 55.2708, "display": "Dubai, UAE", "timezone": "Asia/Dubai"},
+    "singapore": {"lat": 1.3521, "lng": 103.8198, "display": "Singapore", "timezone": "Asia/Singapore"},
+    "moscow": {"lat": 55.7558, "lng": 37.6173, "display": "Moscow, Russia", "timezone": "Europe/Moscow"},
+    "beijing": {"lat": 39.9042, "lng": 116.4074, "display": "Beijing, China", "timezone": "Asia/Shanghai"}
 }
 
-tf = TimezoneFinder()
-
-def geocode_place(place_name: str) -> Dict[str, Any]:
+def geocode_place(place_name: str) -> dict:
     """
-    Geocodes a place name using geopy's Nominatim with strict offline fallbacks
-    for extreme reliability during reviewer testing.
+    Geocodes a place name by checking an offline cache before falling back
+    to OpenStreetMap Nominatim. Resolves the timezone ID.
     """
-    normalized_name = place_name.strip().lower()
+    # 1. Normalize input
+    normalized = place_name.lower().strip()
     
-    # 1. First check offline fallback list
-    if normalized_name in OFFLINE_CITIES:
-        logger.info(f"Geocoding cache hit for offline city: {place_name}")
-        return OFFLINE_CITIES[normalized_name]
+    lat = None
+    lng = None
+    display_name = None
+    timezone_id = None
+    
+    # 2. Exact match check
+    if normalized in OFFLINE_CITIES:
+        city_data = OFFLINE_CITIES[normalized]
+        lat = city_data["lat"]
+        lng = city_data["lng"]
+        display_name = city_data["display"]
+        timezone_id = city_data["timezone"]
         
-    # Check partial match on offline fallback
-    for city_key, city_data in OFFLINE_CITIES.items():
-        if city_key in normalized_name or normalized_name in city_key:
-            logger.info(f"Geocoding fuzzy cache hit for: {place_name} -> {city_data['display_name']}")
-            return city_data
-
-    # 2. Online Geocoding via Nominatim
-    try:
-        geolocator = Nominatim(user_agent="astro_agent_student_assignment_geocoder", timeout=3)
-        location = geolocator.geocode(place_name)
-        if location:
-            lat = location.latitude
-            lon = location.longitude
+    # 3. Fuzzy match check
+    if lat is None:
+        for key, city_data in OFFLINE_CITIES.items():
+            if key in normalized or normalized in key:
+                lat = city_data["lat"]
+                lng = city_data["lng"]
+                display_name = city_data["display"]
+                timezone_id = city_data["timezone"]
+                break
+                
+    # 4. OpenStreetMap Nominatim Fallback
+    if lat is None:
+        try:
+            url = f"https://nominatim.openstreetmap.org/search?q={place_name}&format=json&limit=1"
+            headers = {"User-Agent": "AstroAgent/1.0"}
+            response = requests.get(url, headers=headers, timeout=3)
             
-            # Resolve timezone offline via lat/lon coordinates
-            timezone_str = tf.timezone_at(lng=lon, lat=lat) or "UTC"
-            
-            return {
-                "lat": lat,
-                "lon": lon,
-                "timezone": timezone_str,
-                "display_name": location.address
-            }
-    except Exception as e:
-        logger.warning(f"Online geocoding failed for '{place_name}': {e}. Falling back to default.")
+            if response.status_code == 200:
+                data = response.json()
+                if data and len(data) > 0:
+                    lat = float(data[0]["lat"])
+                    lng = float(data[0]["lon"])
+                    display_name = data[0]["display_name"]
+        except Exception:
+            pass
 
-    # 3. Ultimate safe default if completely offline and query not in cache
-    logger.error(f"Geocoding completely failed for '{place_name}'. Returning default Greenwich coordinates.")
+    # 5. Fail check
+    if lat is None or lng is None:
+        raise ValueError(f"Could not geocode place: {place_name}")
+
+    # 6. Resolve timezone ID
+    if timezone_id is None:
+        try:
+            tf = TimezoneFinder()
+            timezone_id = tf.timezone_at(lat=lat, lng=lng)
+        except Exception:
+            pass
+        if not timezone_id:
+            timezone_id = "UTC"
+
+    # 7. Return payload
     return {
-        "lat": 0.0,
-        "lon": 0.0,
-        "timezone": "UTC",
-        "display_name": f"{place_name} (Fallback GPS)"
+        "lat": lat,
+        "lng": lng,
+        "display_name": display_name,
+        "timezone_id": timezone_id
     }

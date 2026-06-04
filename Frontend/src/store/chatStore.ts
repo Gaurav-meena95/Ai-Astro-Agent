@@ -1,199 +1,150 @@
 import { create } from "zustand";
-import api from "../services/api";
+import axios from "axios";
+import { Message, Session } from "../types";
 
-export interface Message {
-  role: "user" | "assistant";
-  content: string;
-  timestamp: string;
-}
-
-export interface ChatSession {
-  session_id: string;
-  title: string;
-  created_at: string;
-}
+const API = "http://localhost:8000";
 
 interface ChatState {
-  sessions: ChatSession[];
-  activeSessionId: string | null;
-  activeMessages: Message[];
+  sessions: Session[];
+  currentSession: Session | null;
+  messages: Message[];
   isStreaming: boolean;
-  isLoading: boolean;
-  error: string | null;
-
-  fetchSessions: () => Promise<void>;
-  createSession: () => Promise<string | null>;
-  fetchMessages: (sessionId: string) => Promise<void>;
-  sendMessage: (messageText: string) => Promise<void>;
-  selectSession: (sessionId: string | null) => void;
+  fetchSessions: (token: string) => Promise<void>;
+  loadSession: (sessionId: string, token: string) => Promise<void>;
+  sendMessage: (message: string, token: string, sessionId?: string) => Promise<void>;
+  newChat: () => void;
 }
 
 export const useChatStore = create<ChatState>((set, get) => ({
   sessions: [],
-  activeSessionId: null,
-  activeMessages: [],
+  currentSession: null,
+  messages: [],
   isStreaming: false,
-  isLoading: false,
-  error: null,
 
-  fetchSessions: async () => {
-    set({ isLoading: true });
+  fetchSessions: async (token) => {
     try {
-      const response = await api.get("/api/chat/sessions");
-      set({ sessions: response.data, isLoading: false });
-    } catch (err: any) {
-      set({ error: "Failed to load chat history.", isLoading: false });
+      const res = await axios.get(`${API}/api/chat/sessions`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      set({ sessions: res.data });
+    } catch (err) {
+      console.error("Failed to fetch sessions:", err);
     }
   },
 
-  createSession: async () => {
-    set({ isLoading: true });
+  loadSession: async (sessionId, token) => {
     try {
-      const response = await api.post("/api/chat/sessions");
-      const { session_id } = response.data;
-      
-      await get().fetchSessions();
-      set({ activeSessionId: session_id, activeMessages: [], isLoading: false });
-      return session_id;
-    } catch (err: any) {
-      set({ error: "Failed to create new consultation session.", isLoading: false });
-      return null;
+      const res = await axios.get(`${API}/api/chat/sessions/${sessionId}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const dbMessages = res.data.messages || [];
+      const messages = dbMessages.map((m: any) => ({
+        role: m.role === "human" ? "human" : "ai",
+        content: m.content
+      }));
+      set({
+        currentSession: {
+          id: res.data._id,
+          title: res.data.title,
+          created_at: res.data.created_at,
+          updated_at: res.data.updated_at
+        },
+        messages
+      });
+    } catch (err) {
+      console.error("Failed to load session:", err);
     }
   },
 
-  fetchMessages: async (sessionId) => {
-    set({ isLoading: true, error: null });
+  sendMessage: async (message, token, sessionId) => {
+    // 1. Add empty human message to messages
+    set(state => ({
+      messages: [...state.messages, { role: "human", content: message }],
+      isStreaming: true
+    }));
+
     try {
-      const response = await api.get(`/api/chat/sessions/${sessionId}/messages`);
-      set({ activeMessages: response.data, activeSessionId: sessionId, isLoading: false });
-    } catch (err: any) {
-      set({ error: "Failed to retrieve messages.", isLoading: false });
-    }
-  },
-
-  selectSession: (sessionId) => {
-    if (!sessionId) {
-      set({ activeSessionId: null, activeMessages: [] });
-      return;
-    }
-    get().fetchMessages(sessionId);
-  },
-
-  sendMessage: async (messageText) => {
-    const { activeSessionId, activeMessages } = get();
-    if (!activeSessionId) return;
-
-    // 1. Immediately append human message locally
-    const userMsg: Message = {
-      role: "user",
-      content: messageText,
-      timestamp: new Date().toISOString(),
-    };
-    
-    // Create initial empty AI response bubble
-    const aiPlaceholderMsg: Message = {
-      role: "assistant",
-      content: "",
-      timestamp: new Date().toISOString(),
-    };
-
-    set({
-      activeMessages: [...activeMessages, userMsg, aiPlaceholderMsg],
-      isStreaming: true,
-      error: null,
-    });
-
-    const token = localStorage.getItem("astro_token");
-    
-    try {
-      // 2. Query SSE Stream route using raw fetch (handles stream events natively)
-      const response = await fetch("http://localhost:8000/api/chat/send", {
+      const response = await fetch(`${API}/api/chat/send`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`,
+          "Authorization": `Bearer ${token}`
         },
-        body: JSON.stringify({
-          session_id: activeSessionId,
-          message: messageText,
-        }),
+        body: JSON.stringify({ message, session_id: sessionId })
       });
 
       if (!response.ok) {
-        throw new Error("HTTP connection failed");
+        throw new Error(`SSE request failed: ${response.statusText}`);
       }
 
       const reader = response.body?.getReader();
       const decoder = new TextDecoder();
       if (!reader) throw new Error("Null reader on stream");
 
-      let accumulatedAIContent = "";
+      // Add empty AI message to start streaming into
+      set(state => ({
+        messages: [...state.messages, { role: "ai", content: "" }]
+      }));
+
+      let accumulatedText = "";
 
       while (true) {
         const { value, done } = await reader.read();
         if (done) break;
-
+        
         const chunk = decoder.decode(value);
-        // SSE formatting yields lines like "data: {...}\n\n"
         const lines = chunk.split("\n");
-
+        
         for (const line of lines) {
-          const trimmed = line.trim();
-          if (!trimmed.startsWith("data:")) continue;
-
-          const rawData = trimmed.slice(5).trim();
-          if (rawData === "[DONE]") {
-            break;
-          }
-
-          try {
-            const parsed = JSON.parse(rawData);
-            if (parsed.error) {
-              set({ error: parsed.error });
-              break;
+          if (line.startsWith("data: ")) {
+            try {
+              const data = JSON.parse(line.slice(6));
+              if (data.text) {
+                accumulatedText += data.text;
+                // Append text to last AI message
+                set(state => {
+                  const messages = [...state.messages];
+                  if (messages.length > 0 && messages[messages.length - 1].role === "ai") {
+                    messages[messages.length - 1] = {
+                      ...messages[messages.length - 1],
+                      content: accumulatedText
+                    };
+                  }
+                  return { messages };
+                });
+              }
+              if (data.session_id) {
+                set({
+                  currentSession: {
+                    id: data.session_id,
+                    title: message.slice(0, 50),
+                    created_at: new Date().toISOString()
+                  }
+                });
+              }
+              if (data.done) {
+                set({ isStreaming: false });
+              }
+            } catch (e) {
+              // Ignore JSON parse errors for incomplete chunks
             }
-            if (parsed.text) {
-              accumulatedAIContent += parsed.text;
-              
-              // Dynamic state updates to render tokens as they stream in
-              set((state) => {
-                const updated = [...state.activeMessages];
-                const lastIndex = updated.length - 1;
-                if (lastIndex >= 0 && updated[lastIndex].role === "assistant") {
-                  updated[lastIndex] = {
-                    ...updated[lastIndex],
-                    content: accumulatedAIContent,
-                  };
-                }
-                return { activeMessages: updated };
-              });
-            }
-          } catch (e) {
-            // Partial JSON packet splits are skipped/logged defensively
           }
         }
       }
 
-      // Finish streaming, refresh titles list to catch automatic title summaries
-      await get().fetchSessions();
+      // Refresh sessions
+      await get().fetchSessions(token);
       set({ isStreaming: false });
-
-    } catch (err: any) {
-      set((state) => {
-        const updated = [...state.activeMessages];
-        const lastIndex = updated.length - 1;
-        if (lastIndex >= 0 && updated[lastIndex].role === "assistant") {
-          updated[lastIndex] = {
-            ...updated[lastIndex],
-            content: "We encountered an issue generating your response. Please try sending again.",
-          };
-        }
-        return {
-          activeMessages: updated,
-          isStreaming: false,
-          error: "Connection lost while streaming.",
-        };
-      });
+    } catch (err) {
+      set({ isStreaming: false });
+      throw err;
     }
   },
+
+  newChat: () => {
+    set({
+      currentSession: null,
+      messages: []
+    });
+  }
 }));

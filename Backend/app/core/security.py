@@ -1,52 +1,29 @@
-import os
-import bcrypt
-import jwt
 from datetime import datetime, timedelta
-from typing import Dict, Any, Optional
+from jose import jwt
+from passlib.context import CryptContext
+from app.core import config
 
-# Load keys
-JWT_SECRET = os.getenv("JWT_SECRET", "astro_agent_fallback_super_secret_string_123_456")
-JWT_ALGORITHM = os.getenv("JWT_ALGORITHM", "HS256")
-TOKEN_EXPIRE_MINUTES = int(os.getenv("TOKEN_EXPIRE_MINUTES", "1440")) # 24 hours
+# Setup password context
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
-def hash_password(password: str) -> str:
+def hash_password(plain_password: str) -> str:
     """
-    Hashes a plain text password using bcrypt.
+    Hashes a password using passlib bcrypt CryptContext.
     """
-    salt = bcrypt.gensalt()
-    return bcrypt.hashpw(password.encode("utf-8"), salt).decode("utf-8")
+    return pwd_context.hash(plain_password)
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     """
-    Verifies that a plain text password matches its hashed representation.
+    Verifies a plain password against the hashed value.
     """
-    try:
-        return bcrypt.checkpw(plain_password.encode("utf-8"), hashed_password.encode("utf-8"))
-    except Exception:
-        return False
+    return pwd_context.verify(plain_password, hashed_password)
 
-def create_jwt_token(subject: str, expires_delta: Optional[timedelta] = None) -> str:
+def create_access_token(data: dict) -> str:
     """
-    Generates a secure JSON Web Token containing the subject ID and expiration claim.
+    Encodes claims data into a JWT with a 24-hour expiration claim.
     """
-    if expires_delta:
-        expire = datetime.utcnow() + expires_delta
-    else:
-        expire = datetime.utcnow() + timedelta(minutes=TOKEN_EXPIRE_MINUTES)
-        
-    payload = {
-        "sub": str(subject),
-        "exp": expire
-    }
-    
-    return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
-
-def decode_jwt_token(token: str) -> Optional[str]:
-    """
-    Decodes and validates a JWT token. Returns the subject string if valid.
-    """
-    try:
-        payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
-        return payload.get("sub")
-    except jwt.PyJWTError:
-        return None
+    to_encode = data.copy()
+    expire = datetime.utcnow() + timedelta(hours=24)
+    to_encode.update({"exp": expire})
+    encoded_jwt = jwt.encode(to_encode, config.JWT_SECRET, algorithm=config.ALGORITHM)
+    return encoded_jwt

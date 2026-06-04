@@ -1,99 +1,97 @@
-import logging
-from datetime import timedelta
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, HTTPException, Depends
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from pydantic import BaseModel
+from app.core.database import get_db
+from app.core.security import hash_password, verify_password, create_access_token
+from datetime import datetime
+from jose import jwt
 from bson import ObjectId
+from app.core import config
 
-from app.core.security import hash_password, verify_password, create_jwt_token, decode_jwt_token
-from app.core.database import get_database
-from app.schemas.auth import UserAuthRequest, AuthResponse
+router = APIRouter()
+security = HTTPBearer()
 
-logger = logging.getLogger(__name__)
-router = APIRouter(prefix="/api/auth", tags=["Authentication"])
+class SignupRequest(BaseModel):
+    username: str
+    email: str
+    password: str
 
-security_bearer = HTTPBearer()
+class LoginRequest(BaseModel):
+    email: str
+    password: str
 
-async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security_bearer)):
-    """
-    FastAPI security dependency to retrieve the authorized user from the Bearer Token.
-    Returns the user document or raises 401 Unauthorized.
-    """
-    token = credentials.credentials
-    user_id = decode_jwt_token(token)
-    if not user_id:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid or expired session token"
-        )
+@router.post("/signup")
+async def signup(request: SignupRequest):
+    db = get_db()
+    email_lower = request.email.lower()
+    
+    # Check if email already exists
+    existing = await db.users.find_one({"email": email_lower})
+    if existing:
+        raise HTTPException(status_code=400, detail="Email already registered")
         
-    db = get_database()
+    # Hash password and insert user
+    hashed = hash_password(request.password)
+    user_doc = {
+        "username": request.username,
+        "email": email_lower,
+        "hashed_password": hashed,
+        "created_at": datetime.utcnow()
+    }
+    result = await db.users.insert_one(user_doc)
+    inserted_id = result.inserted_id
+    
+    # Generate token
+    token = create_access_token({"sub": str(inserted_id), "email": email_lower})
+    
+    return {
+        "access_token": token,
+        "token_type": "bearer",
+        "username": request.username
+    }
+
+@router.post("/login")
+async def login(request: LoginRequest):
+    db = get_db()
+    email_lower = request.email.lower()
+    
+    # Find user by email
+    user = await db.users.find_one({"email": email_lower})
+    if not user:
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+        
+    # Verify password
+    # In case previous schema was hashed_password or password_hash, handle hashed_password
+    hashed_pass = user.get("hashed_password") or user.get("password_hash")
+    if not hashed_pass or not verify_password(request.password, hashed_pass):
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+        
+    # Generate token
+    token = create_access_token({"sub": str(user["_id"]), "email": email_lower})
+    
+    return {
+        "access_token": token,
+        "token_type": "bearer",
+        "username": user["username"]
+    }
+
+async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
+    token = credentials.credentials
     try:
-        user = await db["users"].find_one({"_id": ObjectId(user_id)})
+        payload = jwt.decode(token, config.JWT_SECRET, algorithms=[config.ALGORITHM])
+        user_id = payload.get("sub")
+        if not user_id:
+            raise HTTPException(status_code=401, detail="Invalid token")
+    except Exception:
+        raise HTTPException(status_code=401, detail="Invalid token")
+        
+    db = get_db()
+    try:
+        user = await db.users.find_one({"_id": ObjectId(user_id)})
     except Exception:
         user = None
         
     if not user:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Authorized user could not be found"
-        )
+        raise HTTPException(status_code=401, detail="User not found")
+        
     return user
-
-@router.post("/signup", response_model=AuthResponse)
-async def signup(payload: UserAuthRequest):
-    """
-    Registers a new user and returns a session JWT.
-    """
-    db = get_database()
-    
-    # Check if user already exists
-    existing_user = await db["users"].find_one({"email": payload.email.lower()})
-    if existing_user:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="An account with this email address already exists"
-        )
-        
-    hashed = hash_password(payload.password)
-    user_doc = {
-        "email": payload.email.lower(),
-        "password_hash": hashed
-    }
-    
-    try:
-        result = await db["users"].insert_one(user_doc)
-        user_id = str(result.inserted_id)
-        token = create_jwt_token(user_id)
-        return {
-            "token": token,
-            "email": payload.email.lower(),
-            "user_id": user_id
-        }
-    except Exception as e:
-        logger.error(f"Signup database error: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Could not complete user registration due to database error"
-        )
-
-@router.post("/login", response_model=AuthResponse)
-async def login(payload: UserAuthRequest):
-    """
-    Authenticates a user, verifies credentials, and returns a new session JWT.
-    """
-    db = get_database()
-    
-    user = await db["users"].find_one({"email": payload.email.lower()})
-    if not user or not verify_password(payload.password, user["password_hash"]):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect email or password credentials provided"
-        )
-        
-    user_id = str(user["_id"])
-    token = create_jwt_token(user_id)
-    return {
-        "token": token,
-        "email": user["email"],
-        "user_id": user_id
-    }

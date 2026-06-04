@@ -1,212 +1,237 @@
-import json
-import logging
-from datetime import date
-from typing import Dict, Any, List
-from langchain_core.messages import SystemMessage, HumanMessage, AIMessage
-from langchain_groq import ChatGroq
+from langchain_core.messages import BaseMessage, HumanMessage, AIMessage, SystemMessage
 
 from app.graph.state import AgentState
-from app.services.interpretations import get_placement_interpretation, lookup_astrology_kb
 from app.services.astrology import compute_birth_chart, get_daily_transits
 from app.services.geocode import geocode_place
+from app.services.interpretations import lookup_astrology_kb
+from datetime import date
+import json
 
-logger = logging.getLogger(__name__)
-
-# Initialize LLM using the same credentials as in services/llm.py
+# Initialize LLM once at module level
+from langchain_groq import ChatGroq
+from app.core.config import GROQ_API_KEY
 llm = ChatGroq(
-    model="llama-3.3-70b-versatile",
-    temperature=0.3
+    model="llama-3.1-8b-instant",
+    temperature=0.7,
+    api_key=GROQ_API_KEY
 )
 
 def should_route(state: AgentState) -> str:
-    """
-    Analyzes the latest user message to route the query to specific context nodes.
-    Returns: 'natal_engine' | 'transit_engine' | 'kb_lookup' | 'agent_synthesizer'
-    """
     messages = state.get("messages", [])
     if not messages:
         return "agent_synthesizer"
-        
-    last_msg = messages[-1].content.lower()
     
-    # 1. Route to natal engine if birth info is mentioned but profile is empty
-    if not state.get("user_profile"):
-        if any(keyword in last_msg for keyword in ["birth", "born", "chart", "natal", "ascendant"]):
-            return "natal_engine"
-            
-    # 2. Route to transit engine for transit questions
-    if any(keyword in last_msg for keyword in ["transit", "today", "current alignment", "daily guidance"]):
+    last_message = messages[-1].content.lower()
+    
+    # 1. If user_profile is None AND any natal keywords in message
+    natal_keywords = [
+        "born", "birth", "dob", "birthdate", "my chart", 
+        "birth chart", "natal", "birth date", "birth time", 
+        "birth place", "i was born"
+    ]
+    if state.get("user_profile") is None and any(word in last_message for word in natal_keywords):
+        return "natal_engine"
+        
+    # 2. If transit keywords in message
+    transit_keywords = [
+        "today", "transit", "daily", "current energy", 
+        "right now", "this week", "planetary energy",
+        "what's happening", "current planets"
+    ]
+    if any(word in last_message for word in transit_keywords):
         return "transit_engine"
         
-    # 3. Route to KB lookup for theoretical questions
-    if any(keyword in last_msg for keyword in ["what does", "explain", "house meaning", "compatibility", "aspect"]):
+    # 3. If kb lookup keywords in message
+    kb_keywords = [
+        "what does", "meaning of", "explain", "what is",
+        "tell me about", "significance of", "interpret"
+    ]
+    if any(word in last_message for word in kb_keywords):
         return "kb_lookup"
         
+    # 4. Default
     return "agent_synthesizer"
 
-def natal_engine_node(state: AgentState) -> Dict[str, Any]:
+async def natal_engine_node(state: AgentState) -> dict:
+    # Step 1: Use LLM to extract birth details from conversation
+    extraction_prompt = """
+    Extract birth details from this conversation.
+    Return ONLY a JSON object with these exact keys:
+    {
+        "birth_date": "YYYY-MM-DD or null",
+        "birth_time": "HH:MM or null", 
+        "birth_place": "city name or null"
+    }
+    If any detail is missing or unclear, use null for that field.
+    Do not include any other text, only the JSON.
     """
-    Attempts to extract birth details from the conversation history,
-    computes coordinates, calculates the birth chart, and updates the state.
-    """
-    messages = state.get("messages", [])
-    if not messages:
-        return {"system_error": "No message history found in natal node."}
+    
+    conversation_text = "\n".join([
+        f"{msg.type}: {msg.content}" 
+        for msg in state["messages"]
+    ])
+    
+    extraction_response = await llm.ainvoke([
+        SystemMessage(content=extraction_prompt),
+        HumanMessage(content=conversation_text)
+    ])
+    
+    # Step 2: Parse the JSON response safely
+    try:
+        raw = extraction_response.content.strip()
+        # Remove markdown code blocks if present
+        if raw.startswith("```"):
+            raw = raw.split("```")[1]
+            if raw.startswith("json"):
+                raw = raw[4:]
+        details = json.loads(raw.strip())
+    except Exception:
+        return {
+            "messages": state["messages"] + [
+                AIMessage(content="I had trouble understanding your birth details. Could you please share your birth date (YYYY-MM-DD), birth time (HH:MM), and birth place?")
+            ],
+            "system_error": "extraction_failed"
+        }
         
-    # System call to extract birth parameters (Date, Time, Place) in structured JSON
-    extraction_prompt = (
-        "Extract birth details from the following conversation history. "
-        "Return ONLY a clean JSON object. Do not include markdown formatting or explanations.\n"
-        "Required keys: birth_date (YYYY-MM-DD), birth_time (HH:MM), birth_place (String).\n"
-        "If a parameter is missing, output null for that key.\n\n"
-        f"History:\n{[m.content for m in messages[-3:]]}"
-    )
+    # Step 3: Validate all fields present
+    missing = []
+    if not details.get("birth_date") or details.get("birth_date") == "null":
+        missing.append("birth date")
+    if not details.get("birth_time") or details.get("birth_time") == "null":
+        missing.append("birth time")
+    if not details.get("birth_place") or details.get("birth_place") == "null":
+        missing.append("birth place")
+        
+    if missing:
+        return {
+            "messages": state["messages"] + [
+                AIMessage(content=f"To create your birth chart, I still need your {', '.join(missing)}. Could you please provide this?")
+            ]
+        }
+        
+    # Step 4: Compute the birth chart
+    try:
+        chart = compute_birth_chart(
+            details["birth_date"],
+            details["birth_time"], 
+            details["birth_place"]
+        )
+    except Exception as e:
+        return {
+            "messages": state["messages"] + [
+                AIMessage(content=f"I couldn't compute your birth chart. Please check your birth details and try again. Error: {str(e)}")
+            ],
+            "system_error": str(e)
+        }
+        
+    # Step 5: Build user_profile and return
+    user_profile = {
+        "lat": chart["location"]["lat"],
+        "lng": chart["location"]["lng"],
+        "timezone_id": chart["location"]["timezone_id"],
+        "birth_date": details["birth_date"],
+        "birth_time": details["birth_time"],
+        "birth_place": details["birth_place"],
+        "placements": chart["placements"],
+        "houses": chart["houses"],
+        "ascendant": chart["ascendant"]
+    }
+    
+    return {
+        "user_profile": user_profile,
+        "system_error": None
+    }
+
+async def transit_engine_node(state: AgentState) -> dict:
+    if not state.get("user_profile"):
+        return {
+            "messages": state["messages"] + [
+                AIMessage(content="I need your birth details first to calculate transits. Could you share your birth date, time, and place?")
+            ]
+        }
+        
+    today = date.today().strftime("%Y-%m-%d")
     
     try:
-        extraction_res = llm.invoke([SystemMessage(content=extraction_prompt)])
-        data = json.loads(extraction_res.content.strip())
-        
-        # Check if all keys exist and are not null
-        if data.get("birth_date") and data.get("birth_place"):
-            birth_time = data.get("birth_time") or "12:00" # Fallback to noon if time is missing
-            
-            # Geocode
-            geo = geocode_place(data["birth_place"])
-            
-            # Calculate Chart
-            chart = compute_birth_chart(
-                data["birth_date"],
-                birth_time,
-                geo["lat"],
-                geo["lon"],
-                geo["timezone"]
-            )
-            
-            profile = {
-                "user_id": None,
-                "birth_date": data["birth_date"],
-                "birth_time": birth_time,
-                "birth_place": data["birth_place"],
-                "latitude": geo["lat"],
-                "longitude": geo["lon"],
-                "timezone_id": geo["timezone"],
-                "natal_placements": chart["placements"],
-                "houses": chart["houses"]
-            }
-            logger.info("Natal engine successfully computed chart details via conversation.")
-            return {"user_profile": profile}
-    except Exception as e:
-        logger.warning(f"Natal engine node extraction or calculation failed: {e}")
-        
-    return {"system_error": "Could not compute birth chart. Please provide birth date (YYYY-MM-DD), time (HH:MM), and place."}
-
-def transit_engine_node(state: AgentState) -> Dict[str, Any]:
-    """
-    Computes transits for the current date based on the user's geocoded location and birth coordinates.
-    """
-    profile = state.get("user_profile")
-    if not profile:
-        return {"system_error": "Cannot calculate transits without a birth chart. Please complete onboarding first."}
-        
-    try:
-        today_str = date.today().strftime("%Y-%m-%d")
-        transits = get_daily_transits(
-            today_str,
-            profile["latitude"],
-            profile["longitude"],
-            profile["timezone_id"]
+        transit_data = get_daily_transits(
+            today,
+            state["user_profile"]["placements"]
         )
-        return {"transit_data": transits}
+        return {"transit_data": transit_data}
     except Exception as e:
-        logger.error(f"Transit calculations failed: {e}")
-        return {"system_error": f"Transit calculations error: {str(e)}"}
+        return {
+            "messages": state["messages"] + [
+                AIMessage(content="I had trouble calculating today's transits. Please try again.")
+            ],
+            "system_error": str(e)
+        }
 
-def kb_lookup_node(state: AgentState) -> Dict[str, Any]:
-    """
-    Retrieves classical astrology definitions matching the user's latest query.
-    """
-    messages = state.get("messages", [])
-    if not messages:
-        return {"retrieved_docs": []}
-        
-    query = messages[-1].content
-    docs = lookup_astrology_kb(query)
-    return {"retrieved_docs": [docs]}
+async def kb_lookup_node(state: AgentState) -> dict:
+    last_message = state["messages"][-1].content
+    results = lookup_astrology_kb(last_message)
+    return {"retrieved_docs": results}
 
-def agent_synthesizer_node(state: AgentState) -> Dict[str, Any]:
-    """
-    Compiles full astronomical coordinates, aspects, transits, RAG logs, and memory context
-    to formulate a professional, grounded, and safe astrological response.
-    """
-    profile = state.get("user_profile")
-    transits = state.get("transit_data")
-    kb_docs = state.get("retrieved_docs", [])
-    system_error = state.get("system_error")
+async def agent_synthesizer_node(state: AgentState) -> dict:
+    # Build system prompt in sections
     
-    # 1. Initialize core system message
-    system_instruction = (
-        "You are AstroAgent, an empathetic, highly professional, and scientifically grounded Vedic astrology assistant.\n"
-        "Your goal is to guide the user accurately and safely based on their actual astronomical placements.\n\n"
-        "IMPORTANT RULES:\n"
-        "1. Never diagnose health conditions, prescribe medical actions, or give legal/extreme financial advice. Safely defer to professionals.\n"
-        "2. Do not hallucinate planetary positions. If birth details are not provided or loaded, guide the user to input them.\n"
-        "3. Keep your tone compassionate, therapeutic, and grounded. Explain astrological placements as spiritual and psychological tendencies, not rigid fate.\n\n"
+    # SECTION 1 — Identity (always included)
+    identity = """You are Aradhana, a warm, compassionate, and wise Vedic astrology guide. You speak with care and insight, helping people understand themselves through the stars. You are conversational, never preachy, and always encouraging. You use simple language and avoid overwhelming the user with too many details at once."""
+    
+    # SECTION 2 — Safety guardrail (ALWAYS included, never remove)
+    safety = """
+ABSOLUTE RULES - NEVER VIOLATE THESE:
+- Never diagnose any physical or mental health condition
+- Never suggest stopping, changing, or starting any medication
+- Never give specific medical advice of any kind
+- Never give legal advice or opinions on legal matters
+- Never give specific financial investment advice
+- Never claim to predict exact future events with certainty
+- Never tell someone their relationship will definitely succeed or fail
+- If asked for any of the above, respond warmly but firmly:
+  'I can offer cosmic guidance and reflection, but for [medical/legal/financial] matters, please consult a qualified professional.'
+"""
+
+    system_prompt_parts = [identity, safety]
+    
+    # SECTION 3 — If user_profile exists
+    if state.get("user_profile"):
+        natal_context = f"""
+User's Birth Chart:
+- Birth Details: {state['user_profile']['birth_place']} on {state['user_profile']['birth_date']} at {state['user_profile']['birth_time']}
+- Ascendant: {state['user_profile'].get('ascendant', 'Unknown')}
+- Planetary Placements:
+{json.dumps(state['user_profile']['placements'], indent=2)}
+- House Positions:
+{json.dumps(state['user_profile']['houses'], indent=2)}
+"""
+        system_prompt_parts.append(natal_context)
+        
+    # SECTION 4 — If transit_data exists
+    if state.get("transit_data"):
+        transit_context = f"""
+Today's Planetary Transits ({state['transit_data']['date']}):
+{json.dumps(state['transit_data']['transits'], indent=2)}
+
+Active Aspects to Your Natal Chart:
+{json.dumps(state['transit_data']['aspects_to_natal'], indent=2)}
+"""
+        system_prompt_parts.append(transit_context)
+        
+    # SECTION 5 — If retrieved_docs exists and not empty
+    if state.get("retrieved_docs"):
+        kb_context = f"""
+Relevant Astrological Interpretations:
+{chr(10).join(state['retrieved_docs'])}
+"""
+        system_prompt_parts.append(kb_context)
+        
+    system_prompt = "\n\n".join(system_prompt_parts)
+    
+    response = await llm.ainvoke(
+        [SystemMessage(content=system_prompt)] + state["messages"]
     )
     
-    # 2. Inject Birth Chart contexts if available
-    if profile:
-        placements_str = "\n".join([
-            f"- {p}: {info['sign']} at {info['degree']}°, House {info['house']} {'(Retrograde)' if info['retrograde'] else ''}"
-            for p, info in profile["natal_placements"].items()
-        ])
-        
-        # Pull pre-computed interpretations for their exact placements
-        interpretations = []
-        for p, info in profile["natal_placements"].items():
-            if p in ["Sun", "Moon", "Mars"]:
-                interp = get_placement_interpretation(p, info["sign"], info["house"])
-                interpretations.append(interp)
-                
-        system_instruction += (
-            f"USER BIRTH CHART DETAILS:\n"
-            f"Birth Date: {profile['birth_date']}\n"
-            f"Birth Time: {profile['birth_time']}\n"
-            f"Birth Location: {profile['birth_place']}\n"
-            f"Planetary Placements:\n{placements_str}\n\n"
-            f"GUIDED INTERPRETATION BLUEPRINT:\n"
-            f"{chr(10).join(interpretations)}\n\n"
-        )
-        
-    # 3. Inject Transit context if available
-    if transits:
-        transit_placements = transits.get("placements", {})
-        transits_str = "\n".join([
-            f"- {p}: Transiting {info['sign']} at {info['degree']}°"
-            for p, info in transit_placements.items() if p in ["Sun", "Moon", "Mars", "Jupiter", "Saturn"]
-        ])
-        system_instruction += (
-            f"ACTIVE TRANSITS TODAY:\n{transits_str}\n\n"
-        )
-        
-    # 4. Inject retrieved general knowledge
-    if kb_docs:
-        system_instruction += (
-            f"ADDITIONAL ASTROLOGICAL REFERENCE INFO:\n"
-            f"{chr(10).join(kb_docs)}\n\n"
-        )
-        
-    # 5. Inject systems errors if user needs onboarding guidance
-    if system_error:
-        system_instruction += (
-            f"SYSTEM NOTIFICATION:\n{system_error}\n"
-            "Instruct the user on how they can complete their onboarding or input their birth details.\n\n"
-        )
-        
-    # Compile messages list
-    messages_payload = [SystemMessage(content=system_instruction)] + state["messages"]
-    
-    # Run Inference
-    response = llm.invoke(messages_payload)
-    
-    # Append the new AI response message to the state's message list
-    return {"messages": [response], "system_error": None} # Clear temporary system errors
+    return {
+        "messages": state["messages"] + [response],
+        "retrieved_docs": []
+    }
