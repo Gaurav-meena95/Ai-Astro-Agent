@@ -39,7 +39,8 @@ export default function OnboardingPage({ onComplete }: { onComplete: () => void 
 
   return (
     <div style={{
-      minHeight: "100vh",
+      height: "100vh",
+      overflowY: "auto",
       display: "flex",
       alignItems: "center",
       justifyContent: "center",

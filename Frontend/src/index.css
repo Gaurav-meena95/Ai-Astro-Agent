@@ -15,16 +15,22 @@
 
 * { margin:0; padding:0; box-sizing:border-box; }
 
+html, body, #root {
+  height: 100vh;
+  width: 100vw;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+}
+
 body {
   background: radial-gradient(circle at 50% 50%, #0d0d1a 0%, #08080f 80%);
   color: var(--text);
   font-family: 'Inter', sans-serif;
   font-size: 14px;
   line-height: 1.6;
-  min-height: 100vh;
   -webkit-font-smoothing: antialiased;
   position: relative;
-  overflow-x: hidden;
 }
 
 /* Vedic holy ambient glows */
@@ -179,6 +185,8 @@ body::after {
   background: var(--bg-surface);
   z-index: 100;
   transition: transform 0.3s ease;
+  min-height: 0;
+  min-width: 0;
 }
 
 .dashboard-chat {
@@ -188,6 +196,8 @@ body::after {
   height: 100%;
   background: var(--bg);
   position: relative;
+  min-height: 0;
+  min-width: 0;
 }
 
 .dashboard-right-panel {
@@ -197,6 +207,8 @@ body::after {
   border-left: 1px solid var(--border);
   background: var(--bg-surface);
   transition: transform 0.3s ease;
+  min-height: 0;
+  min-width: 0;
 }
 
 /* Media query for mobile */

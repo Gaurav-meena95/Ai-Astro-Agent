@@ -175,7 +175,7 @@ export const DashboardPage: FC = () => {
 
   const renderSidebarContent = () => (
     <>
-      <div className="flex flex-col overflow-y-auto" style={{ flex: 1 }}>
+      <div style={{ flex: 1, display: "flex", flexDirection: "column", overflowY: "auto" }}>
         {/* Logo Section */}
         <div
           onClick={() => {

@@ -2,7 +2,8 @@
 export default function LandingPage({ onGetStarted }: { onGetStarted: () => void }) {
   return (
     <div style={{
-      minHeight: "100vh",
+      height: "100vh",
+      overflowY: "auto",
       display: "flex",
       flexDirection: "column",
       background: "var(--bg)"
