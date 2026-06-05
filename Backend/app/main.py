@@ -1,12 +1,22 @@
 import os
 import sys
 
+# 0. Patch bcrypt compatibility for passlib (fixes AttributeError and 72-byte ValueError on Python 3.12+)
+try:
+    import bcrypt
+    class DummyAbout:
+        __version__ = getattr(bcrypt, "__version__", "4.0.0")
+    bcrypt.__about__ = DummyAbout()
+except ImportError:
+    pass
+
 # 1. Config writeable cache directory on Vercel for libephemeris
 if os.getenv("VERCEL"):
     os.environ["LIBEPHEMERIS_DATA_DIR"] = "/tmp"
 
 # 2. Map swisseph to libephemeris using a wrapper class to handle default parameters (C-API compatibility)
 try:
+    # pyrefly: ignore [missing-import]
     import libephemeris
     
     class SwissephWrapper:
