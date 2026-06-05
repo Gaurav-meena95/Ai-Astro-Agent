@@ -1,4 +1,29 @@
 import os
+import sys
+
+# 1. Config writeable cache directory on Vercel for libephemeris
+if os.getenv("VERCEL"):
+    os.environ["LIBEPHEMERIS_DATA_DIR"] = "/tmp"
+
+# 2. Map swisseph to libephemeris using a wrapper class to handle default parameters (C-API compatibility)
+try:
+    import libephemeris
+    
+    class SwissephWrapper:
+        def __getattr__(self, name):
+            return getattr(libephemeris, name)
+            
+        def calc_ut(self, tjd_ut, ipl, iflag=0):
+            return libephemeris.calc_ut(tjd_ut, ipl, iflag)
+            
+    sys.modules['swisseph'] = SwissephWrapper()
+except ImportError:
+    pass
+
+# 3. Add app base directory to sys.path so that 'import flatlib' resolves to the vendored 'app/flatlib'
+base_dir = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, base_dir)
+
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware

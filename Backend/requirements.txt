@@ -4,7 +4,6 @@ motor>=3.5.0
 pydantic>=2.8.0
 bcrypt>=4.2.0
 pyjwt>=2.8.0
-flatlib>=0.2.3
 geopy>=2.4.1
 timezonefinder>=6.5.0
 pytz>=2024.1
@@ -16,4 +15,5 @@ python-dotenv>=1.0.1
 python-jose>=3.3.0
 passlib>=1.7.4
 dnspython>=2.0.0
+libephemeris
 
