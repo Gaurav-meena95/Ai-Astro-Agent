@@ -1,7 +1,7 @@
 from dotenv import load_dotenv
 import os
 
-load_dotenv()
+load_dotenv(override=True)
 
 MONGO_URI = os.getenv("MONGO_URI", "mongodb://localhost:27017/astroagent")
 JWT_SECRET = os.getenv("JWT_SECRET", "fallback_secret")
